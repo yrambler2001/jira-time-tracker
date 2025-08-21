@@ -1,0 +1,14 @@
+[build]
+  publish = "build/"
+  command = "sed -i s%TEST1%${TEST1}%g netlify.toml && npm run build"
+
+[[redirects]]
+  from = "/test1/*"
+  to = "TEST1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
