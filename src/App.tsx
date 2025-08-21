@@ -119,8 +119,8 @@ const SettingsIcon = () => (
     strokeLinejoin="round"
     className="h-5 w-5"
   >
-    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.73l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.73l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
     <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 );
 const SearchIcon = () => (
@@ -140,7 +140,7 @@ const SearchIcon = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
-const LockIcon = () => (
+const CalculatorIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"
@@ -153,25 +153,11 @@ const LockIcon = () => (
     strokeLinejoin="round"
     className="h-4 w-4"
   >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-const UnlockIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-4 w-4"
-  >
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+    <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+    <line x1="8" y1="6" x2="16" y2="6" />
+    <line x1="16" y1="14" x2="16" y2="18" />
+    <line x1="12" y1="10" x2="12" y2="18" />
+    <line x1="8" y1="10" x2="8" y2="18" />
   </svg>
 );
 
@@ -294,7 +280,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   );
 };
 
-type LockedField = 'start' | 'end' | 'duration' | null;
+type AutoCalcField = 'start' | 'end' | 'duration';
+
+interface TimelogFormProps {
+  initialData: {
+    startDateMoment: moment.Moment;
+    endDateMoment: moment.Moment;
+    durationString: string;
+    description: string;
+  };
+  onSave: (data: any) => void;
+  buttonText: string;
+}
 
 interface TimelogFormProps {
   initialData: {
@@ -312,12 +309,8 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
   const [endTime, setEndTime] = useState(initialData.endDateMoment.format('YYYY-MM-DD HH:mm:ss'));
   const [duration, setDuration] = useState(initialData.durationString);
   const [description, setDescription] = useState(initialData.description);
-  const [lockedField, setLockedField] = useState<LockedField>('end');
-  const [lastEdited, setLastEdited] = useState<LockedField>(null);
-
-  const handleLock = (field: LockedField) => {
-    setLockedField((current) => (current === field ? null : field));
-  };
+  const [autoCalcField, setAutoCalcField] = useState<AutoCalcField>('duration');
+  const [lastEdited, setLastEdited] = useState<AutoCalcField | null>(null);
 
   useEffect(() => {
     const startMoment = moment(startTime, 'YYYY-MM-DD HH:mm:ss');
@@ -326,57 +319,34 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
 
     if (!startMoment.isValid() || !endMoment.isValid() || !lastEdited) return;
 
-    if (lockedField !== 'start' && lockedField !== 'end' && lockedField !== 'duration') {
-      if (lastEdited === 'start') {
-        const newDuration = moment.duration(endMoment.diff(startMoment)).asSeconds();
-        setDuration(formatSecondsToDuration(newDuration));
-      } else if (lastEdited === 'end') {
-        const newDuration = moment.duration(endMoment.diff(startMoment)).asSeconds();
-        setDuration(formatSecondsToDuration(newDuration));
-      } else if (lastEdited === 'duration') {
-        const newEnd = startMoment.clone().add(durationSeconds, 'seconds');
-        setEndTime(newEnd.format('YYYY-MM-DD HH:mm:ss'));
-      }
-    } else if (lockedField === 'start') {
-      if (lastEdited === 'end') {
-        const newDuration = moment.duration(endMoment.diff(startMoment)).asSeconds();
-        setDuration(formatSecondsToDuration(newDuration));
-      } else if (lastEdited === 'duration') {
-        const newEnd = startMoment.clone().add(durationSeconds, 'seconds');
-        setEndTime(newEnd.format('YYYY-MM-DD HH:mm:ss'));
-      }
-    } else if (lockedField === 'end') {
-      if (lastEdited === 'start') {
-        const newDuration = moment.duration(endMoment.diff(startMoment)).asSeconds();
-        setDuration(formatSecondsToDuration(newDuration));
-      } else if (lastEdited === 'duration') {
-        const newStart = endMoment.clone().subtract(durationSeconds, 'seconds');
-        setStartTime(newStart.format('YYYY-MM-DD HH:mm:ss'));
-      }
-    } else if (lockedField === 'duration') {
-      if (lastEdited === 'start') {
-        const newEnd = startMoment.clone().add(durationSeconds, 'seconds');
-        setEndTime(newEnd.format('YYYY-MM-DD HH:mm:ss'));
-      } else if (lastEdited === 'end') {
-        const newStart = endMoment.clone().subtract(durationSeconds, 'seconds');
-        setStartTime(newStart.format('YYYY-MM-DD HH:mm:ss'));
-      }
+    if (autoCalcField === 'start') {
+      const newStart = endMoment.clone().subtract(durationSeconds, 'seconds');
+      setStartTime(newStart.format('YYYY-MM-DD HH:mm:ss'));
+    } else if (autoCalcField === 'end') {
+      const newEnd = startMoment.clone().add(durationSeconds, 'seconds');
+      setEndTime(newEnd.format('YYYY-MM-DD HH:mm:ss'));
+    } else if (autoCalcField === 'duration') {
+      const newDuration = moment.duration(endMoment.diff(startMoment)).asSeconds();
+      setDuration(formatSecondsToDuration(newDuration));
     }
-  }, [startTime, endTime, duration, lockedField, lastEdited]);
+  }, [startTime, endTime, duration, autoCalcField, lastEdited]);
 
   const handleSave = () => {
     onSave({ startTime, endTime, duration, description });
   };
 
-  const renderLock = (field: LockedField) => (
-    <button onClick={() => handleLock(field)} className={`p-1 rounded ${lockedField === field ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}>
-      {lockedField === field ? <LockIcon /> : <UnlockIcon />}
+  const renderAutoCalcRadio = (field: AutoCalcField) => (
+    <button
+      onClick={() => setAutoCalcField(field)}
+      className={`p-1 rounded ${autoCalcField === field ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
+    >
+      <CalculatorIcon />
     </button>
   );
 
-  const getInputClass = (field: LockedField) => {
+    const getInputClass = (field: AutoCalcField) => {
     const baseClass = 'block w-full p-2 border rounded-md bg-transparent dark:border-gray-600 dark:text-gray-300';
-    return lockedField === field ? `${baseClass} bg-gray-100 dark:bg-gray-700` : baseClass;
+    return autoCalcField === field ? `${baseClass} bg-gray-100 dark:bg-gray-700` : baseClass;
   };
 
   return (
@@ -392,32 +362,32 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
       </div>
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">Start Time</label>
+          <label className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">Start</label>
           <input
             type="text"
-            name="startTime"
             value={startTime}
             onChange={(e) => {
               setStartTime(e.target.value);
               setLastEdited('start');
             }}
+            disabled={autoCalcField === 'start'}
             className={getInputClass('start')}
           />
-          {renderLock('start')}
+          {renderAutoCalcRadio('start')}
         </div>
         <div className="flex items-center gap-2">
-          <label className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">End Time</label>
+          <label className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">End</label>
           <input
             type="text"
-            name="endTime"
             value={endTime}
             onChange={(e) => {
               setEndTime(e.target.value);
               setLastEdited('end');
             }}
+            disabled={autoCalcField === 'end'}
             className={getInputClass('end')}
           />
-          {renderLock('end')}
+          {renderAutoCalcRadio('end')}
         </div>
         <div className="flex items-center gap-2">
           <label className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">Duration</label>
@@ -428,9 +398,10 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
               setDuration(e.target.value);
               setLastEdited('duration');
             }}
+            disabled={autoCalcField === 'duration'}
             className={getInputClass('duration')}
           />
-          {renderLock('duration')}
+          {renderAutoCalcRadio('duration')}
         </div>
       </div>
       <div className="flex justify-end pt-4">
