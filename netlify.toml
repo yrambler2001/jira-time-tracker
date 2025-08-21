@@ -1,5 +1,5 @@
 [build]
-  publish = "build/"
+  publish = "dist/"
   command = "sed -i s%TEST1%${TEST1}%g netlify.toml && npm run build"
 
 [[redirects]]
