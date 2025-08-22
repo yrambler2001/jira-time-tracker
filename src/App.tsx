@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import _ from 'lodash';
 import moment from 'moment';
+import { getLogsForDay } from './model';
 
 // Makes sure global libraries are available for debugging if needed
 window.moment = moment;
@@ -31,6 +32,7 @@ interface ProcessedTimelog extends JiraTimelog {
 
 interface Settings {
   jiraToken: string;
+  email: string;
   propertiesTicket: string;
   displayOnNewLine: boolean;
 }
@@ -232,6 +234,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     <Modal isOpen={isOpen} onClose={onClose} title="Settings">
       <div className="space-y-4">
         <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Your Email</label>
+          <input
+            type="text"
+            value={localSettings.email}
+            onChange={(e) => setLocalSettings({ ...localSettings, email: e.target.value })}
+            className="mt-1 block w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+          />
+        </div>
+        <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Jira API Token</label>
           <input
             type="password"
@@ -344,7 +355,7 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
     </button>
   );
 
-    const getInputClass = (field: AutoCalcField) => {
+  const getInputClass = (field: AutoCalcField) => {
     const baseClass = 'block w-full p-2 border rounded-md bg-transparent dark:border-gray-600 dark:text-gray-300';
     return autoCalcField === field ? `${baseClass} bg-gray-100 dark:bg-gray-700` : baseClass;
   };
@@ -631,7 +642,7 @@ export default function App() {
   const [ticketForAddLog, setTicketForAddLog] = useState<JiraTicket | null>(null);
 
   // State for settings
-  const [settings, setSettings] = useState<Settings>({ jiraToken: '', propertiesTicket: '', displayOnNewLine: false });
+  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', propertiesTicket: '', displayOnNewLine: false });
 
   // Load settings from localStorage on initial render
   useEffect(() => {
@@ -651,18 +662,14 @@ export default function App() {
 
   // Fetch data when date changes
   useEffect(() => {
-    fetch('http://localhost:3999/logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ day: moment(selectedDate).format('YYYY-MM-DD') }),
-    })
-      .then((r) => r.json())
+    if (!settings.email || !settings.jiraToken) return;
+    getLogsForDay({ day: moment(selectedDate).format('YYYY-MM-DD'), email: settings.email, apiToken: settings.jiraToken })
       .then((data) => {
         setBackendData(data);
         window.backendData = data;
       })
       .catch((err) => console.error('Failed to fetch logs:', err));
-  }, [selectedDate]);
+  }, [selectedDate, settings.email, settings.jiraToken]);
 
   const jiraTimelogs = useMemo(() => backendData || [], [backendData]);
 
