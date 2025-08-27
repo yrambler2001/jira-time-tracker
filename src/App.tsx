@@ -602,7 +602,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 break-all">
           {logs.map((log) => (
             <tr
               key={log.id}
