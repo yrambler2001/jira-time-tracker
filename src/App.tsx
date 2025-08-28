@@ -625,6 +625,45 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
   </div>
 );
 
+interface State {}
+
+const parseState = (state: string) => {
+  let parsed: State | null = null;
+  try {
+    parsed = JSON.parse(state);
+  } catch (e) {
+    console.error('can not parse data ', e);
+  }
+  if (!parsed || typeof parsed === 'string' || typeof parsed === 'number') parsed = {};
+  return parsed as State;
+};
+const stringifyState = (state: State) => {
+  const stringified = JSON.stringify(state);
+  return stringified;
+};
+interface InitProps {
+  setState: (state: State) => void;
+  client: JiraApiClient;
+}
+interface SubmitStateProps {
+  state: State;
+  client: JiraApiClient;
+}
+
+let lastSubmittedState: string = 'blank';
+const init = async ({ setState, client }: InitProps) => {
+  const stateText = await client.getUserProperty('com.yrambler2001.jira-tracker');
+  const parsedState = parseState(stateText);
+  lastSubmittedState = stateText;
+  setState(parsedState);
+};
+const submitState = async ({ state, client }: SubmitStateProps) => {
+  const stateText = stringifyState(state);
+  if (lastSubmittedState === stateText || lastSubmittedState === 'blank') return;
+  console.log(lastSubmittedState, stateText);
+  await client.setUserProperty('com.yrambler2001.jira-tracker', stateText);
+};
+
 // --- Main App Component ---
 export default function App() {
   const [client, setClient] = useState<JiraApiClient | null>(null);
@@ -645,6 +684,11 @@ export default function App() {
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', propertiesTicket: '', displayOnNewLine: false });
 
+  const [state, setState] = useState<State | undefined>(null);
+  useEffect(() => {
+    if (client) submitState({ state, client });
+  }, [client, state]);
+
   // Load settings from localStorage on initial render
   useEffect(() => {
     const savedSettings = localStorage.getItem('jiraTimelogSettings');
@@ -664,8 +708,9 @@ export default function App() {
   // Fetch data when date changes
   useEffect(() => {
     if (!settings.email || !settings.jiraToken) return;
-    JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then((client) => {
+    JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then(async (client) => {
       setClient(client);
+      await init({ client, setState });
       window.client = client;
     });
   }, [settings?.email, settings?.jiraToken]);
