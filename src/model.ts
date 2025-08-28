@@ -541,7 +541,8 @@ private static instance: JiraApiClient;
       fetchTimelogStartedAfter,
     });
 
-    const allWorklogsPromises = data.issues.map(async (issue) => {
+    const flattenedWorklogs: { issue: JiraIssue; worklog: JiraWorklog }[] = [];
+    for (const issue of data.issues) {
       let worklogs = issue.fields.worklog.worklogs ?? [];
       if (issue.fields.worklog.total > issue.fields.worklog.maxResults) {
         worklogs = await this.fetchPaginatedWorklogs(issue.key, {
@@ -549,15 +550,14 @@ private static instance: JiraApiClient;
           fetchTimelogStartedAfter,
         });
       }
-      return this.filterWorklogs({
+      const filteredLogs = this.filterWorklogs({
         worklogs: worklogs.map((w) => ({ issue, worklog: w })),
         startOfDay,
         endOfDay,
       });
-    });
+      flattenedWorklogs.push(...filteredLogs);
+    }
 
-    const allFilteredWorklogs = await Promise.all(allWorklogsPromises);
-    const flattenedWorklogs = _.flatten(allFilteredWorklogs);
     return _.orderBy(flattenedWorklogs, (x) => +moment(x.worklog.started));
   }
 }
