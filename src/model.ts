@@ -490,7 +490,7 @@ export class JiraApiClient {
     const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog`;
     const body: any = {
       timeSpentSeconds: worklog.timeSpentSeconds,
-      started: worklog.started,
+      started: moment(worklog.started).toISOString().replace('Z','+0000'),
     };
 
     if (worklog.comment) {
@@ -547,7 +547,7 @@ export class JiraApiClient {
     const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog/${worklogId}`;
     const body: any = {
       timeSpentSeconds: worklog.timeSpentSeconds,
-      started: worklog.started,
+      started: moment(worklog.started).toISOString().replace('Z','+0000'),
     };
 
     if (worklog.comment) {

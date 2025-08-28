@@ -28,6 +28,7 @@ interface ProcessedTimelog extends JiraTimelog {
   endDateDisplay: React.ReactNode;
   durationString: string;
   workDescription: string;
+  isTracking?: false;
 }
 
 interface Settings {
@@ -39,6 +40,21 @@ interface Settings {
 interface JiraTicket {
   key: string;
   summary: string;
+}
+
+interface TrackedTicket {
+  id: string;
+  issue: {
+    key: string;
+    fields: {
+      summary: string;
+    };
+  };
+  startDate: Date;
+  startDateMoment: moment.Moment;
+  startDateDisplay: React.ReactNode;
+  durationString: string;
+  isTracking: true;
 }
 
 // --- Helper Functions ---
@@ -290,21 +306,11 @@ interface TimelogFormProps {
     description: string;
   };
   onSave: (data: any) => void;
+  onDelete?: () => void;
   buttonText: string;
 }
 
-interface TimelogFormProps {
-  initialData: {
-    startDateMoment: moment.Moment;
-    endDateMoment: moment.Moment;
-    durationString: string;
-    description: string;
-  };
-  onSave: (data: any) => void;
-  buttonText: string;
-}
-
-const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonText }) => {
+const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, onDelete, buttonText }) => {
   const [startTime, setStartTime] = useState(initialData.startDateMoment.format('YYYY-MM-DD HH:mm:ss'));
   const [endTime, setEndTime] = useState(initialData.endDateMoment.format('YYYY-MM-DD HH:mm:ss'));
   const [duration, setDuration] = useState(initialData.durationString);
@@ -332,7 +338,10 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
   }, [startTime, endTime, duration, autoCalcField, lastEdited]);
 
   const handleSave = () => {
-    onSave({ startTime, endTime, duration, description });
+    const startMoment = moment(startTime, 'YYYY-MM-DD HH:mm:ss');
+    const endMoment = moment(endTime, 'YYYY-MM-DD HH:mm:ss');
+    const durationSeconds = endMoment.diff(startMoment, 'seconds');
+    onSave({ started: startMoment.toISOString(), timeSpentSeconds: durationSeconds, comment: description });
   };
 
   const renderAutoCalcRadio = (field: AutoCalcField) => (
@@ -404,8 +413,13 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, buttonTe
           {renderAutoCalcRadio('duration')}
         </div>
       </div>
-      <div className="flex justify-end pt-4">
-        <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+      <div className="flex justify-between items-center pt-4">
+        {onDelete && (
+          <button onClick={onDelete} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+            Delete
+          </button>
+        )}
+        <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto">
           {buttonText}
         </button>
       </div>
@@ -417,22 +431,44 @@ interface EditTimelogModalProps {
   isOpen: boolean;
   onClose: () => void;
   log: ProcessedTimelog | null;
+  client: JiraApiClient | null;
+  onUpdate: () => void;
 }
-const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, log }) => {
-  if (!log) return null;
+const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, log, client, onUpdate }) => {
+  if (!log || !client) return null;
+
   const initialData = {
     startDateMoment: log.startDateMoment,
     endDateMoment: log.endDateMoment,
     durationString: log.durationString,
     description: log.workDescription || '',
   };
-  const handleSave = (data: any) => {
-    console.log('Saving changes for log:', log.id, data);
+
+  const handleSave = async (data: any) => {
+    try {
+      await client.updateWorklog(log.issue.key, log.id, data);
+      onUpdate();
+    } catch (error) {
+      console.error('Failed to update worklog:', error);
+    }
     onClose();
   };
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this worklog?')) {
+      try {
+        await client.deleteWorklog(log.issue.key, log.id);
+        onUpdate();
+      } catch (error) {
+        console.error('Failed to delete worklog:', error);
+      }
+      onClose();
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit Timelog for ${log.issue.key}`}>
-      <TimelogForm initialData={initialData} onSave={handleSave} buttonText="Update Timelog" />
+      <TimelogForm initialData={initialData} onSave={handleSave} onDelete={handleDelete} buttonText="Update Timelog" />
     </Modal>
   );
 };
@@ -441,19 +477,28 @@ interface AddTimelogModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticket: JiraTicket | null;
+  client: JiraApiClient | null;
+  onUpdate: () => void;
 }
-const AddTimelogModal: React.FC<AddTimelogModalProps> = ({ isOpen, onClose, ticket }) => {
-  if (!ticket) return null;
+const AddTimelogModal: React.FC<AddTimelogModalProps> = ({ isOpen, onClose, ticket, client, onUpdate }) => {
+  if (!ticket || !client) return null;
   const initialData = {
     startDateMoment: moment().subtract(10, 'minutes'),
     endDateMoment: moment(),
     durationString: '10m',
     description: '',
   };
-  const handleSave = (data: any) => {
-    console.log('Adding new log for ticket:', ticket.key, data);
+
+  const handleSave = async (data: any) => {
+    try {
+      await client.addWorklog(ticket.key, data);
+      onUpdate();
+    } catch (error) {
+      console.error('Failed to add worklog:', error);
+    }
     onClose();
   };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Add Timelog for ${ticket.key}`}>
       <TimelogForm initialData={initialData} onSave={handleSave} buttonText="Add Timelog" />
@@ -465,16 +510,47 @@ interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddLog: (ticket: JiraTicket) => void;
+  onStartTracking: (ticket: JiraTicket) => void;
+  client: JiraApiClient | null;
 }
 
-const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog }) => {
+const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, onStartTracking, client }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const searchResults: JiraTicket[] = searchTerm
-    ? [
-        { key: 'PROJ-123', summary: 'Fix the main login button' },
-        { key: 'PROJ-456', summary: 'Implement new dashboard feature' },
-      ].filter((item) => item.key.toLowerCase().includes(searchTerm.toLowerCase()) || item.summary.toLowerCase().includes(searchTerm.toLowerCase()))
-    : [];
+  const [searchResults, setSearchResults] = useState<JiraTicket[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setSearchResults([]);
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      if (searchTerm.length > 2 && client) {
+        setIsLoading(true);
+        client
+          .findIssuesWithPicker(searchTerm)
+          .then((response) => {
+            const tickets = response.sections.flatMap((section) => section.issues.map((issue) => ({ key: issue.key, summary: issue.summaryText })));
+            setSearchResults(tickets);
+          })
+          .catch((err) => console.error('Search failed:', err))
+          .finally(() => setIsLoading(false));
+      } else {
+        setSearchResults([]);
+      }
+    }, 500); // Debounce search
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, client, isOpen]);
+
+  const handleStartTracking = (ticket: JiraTicket) => {
+    onStartTracking(ticket);
+    onClose();
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Search Jira Ticket">
@@ -485,22 +561,28 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog }) 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+          autoFocus
         />
         <div className="max-h-60 overflow-y-auto">
-          {searchResults.map((ticket) => (
-            <div key={ticket.key} className="p-2 border-b dark:border-gray-700 flex justify-between items-center">
-              <div>
-                <div className="font-semibold text-blue-600 dark:text-blue-400">{ticket.key}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">{ticket.summary}</div>
+          {isLoading && <div className="p-2 text-center text-gray-500">Searching...</div>}
+          {!isLoading &&
+            searchResults.map((ticket) => (
+              <div key={ticket.key} className="p-2 border-b dark:border-gray-700 flex justify-between items-center">
+                <div>
+                  <div className="font-semibold text-blue-600 dark:text-blue-400">{ticket.key}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">{ticket.summary}</div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => handleStartTracking(ticket)} className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded">
+                    Start Tracking
+                  </button>
+                  <button onClick={() => onAddLog(ticket)} className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded">
+                    Add Log
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded">Start Tracking</button>
-                <button onClick={() => onAddLog(ticket)} className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded">
-                  Add Log
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          {!isLoading && searchTerm.length > 2 && searchResults.length === 0 && <div className="p-2 text-center text-gray-500">No results found.</div>}
         </div>
       </div>
     </Modal>
@@ -559,12 +641,14 @@ const TimelineBar: React.FC<TimelineBarProps> = ({ log, minDate, maxDateMinDateD
   );
 };
 interface TimelineTableProps {
-  logs: ProcessedTimelog[];
+  logs: (ProcessedTimelog | TrackedTicket)[];
   hoveredLogId: string | null;
   setHoveredLogId: (id: string | null) => void;
   onRowClick: (log: ProcessedTimelog) => void;
+  onStopTracking: (ticketKey: string) => void;
+  onDiscardTracking: (ticketKey: string) => void;
 }
-const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHoveredLogId, onRowClick }) => (
+const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHoveredLogId, onRowClick, onStopTracking, onDiscardTracking }) => (
   <div className="mt-8 max-w-7xl mx-auto">
     <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Timelog Details</h2>
     <div className="shadow border-b border-gray-200 dark:border-gray-700 sm:rounded-lg overflow-hidden">
@@ -589,23 +673,52 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
             <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Duration
             </th>
+            <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 break-all">
           {logs.map((log) => (
             <tr
               key={log.id}
-              className={`transition-colors duration-200 cursor-pointer ${hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+              className={`transition-colors duration-200 ${!log.isTracking ? 'cursor-pointer' : ''} ${hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}`}
               onMouseEnter={() => setHoveredLogId(log.id)}
               onMouseLeave={() => setHoveredLogId(null)}
-              onClick={() => onRowClick(log)}
+              onClick={() => !log.isTracking && onRowClick(log as ProcessedTimelog)}
             >
               <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">{log.issue.key}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.issue.fields.summary}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.workDescription}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">
+                {!log.isTracking ? (log as ProcessedTimelog).workDescription : <i className="text-gray-400">In progress...</i>}
+              </td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.endDateDisplay}</td>
+              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{!log.isTracking ? (log as ProcessedTimelog).endDateDisplay : ''}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{log.durationString}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                {log.isTracking && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStopTracking(log.issue.key);
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Stop
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDiscardTracking(log.issue.key);
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -614,7 +727,14 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
   </div>
 );
 
-interface State {}
+interface State {
+  trackedTickets: {
+    [key: string]: {
+      startTime: string;
+      summary: string;
+    };
+  };
+}
 
 const parseState = (state: string) => {
   let parsed: State | null = null;
@@ -623,7 +743,8 @@ const parseState = (state: string) => {
   } catch (e) {
     console.error('can not parse data ', e);
   }
-  if (!parsed || typeof parsed === 'string' || typeof parsed === 'number') parsed = {};
+  if (!parsed || typeof parsed !== 'object') parsed = { trackedTickets: {} };
+  if (!parsed.trackedTickets) parsed.trackedTickets = {};
   return parsed as State;
 };
 const stringifyState = (state: State) => {
@@ -643,14 +764,15 @@ let lastSubmittedState: string = 'blank';
 const init = async ({ setState, client }: InitProps) => {
   const stateText = await client.getUserProperty('com.yrambler2001.jira-tracker');
   const parsedState = parseState(stateText);
-  lastSubmittedState = stateText;
+  lastSubmittedState = stringifyState(parsedState);
   setState(parsedState);
 };
 const submitState = async ({ state, client }: SubmitStateProps) => {
   const stateText = stringifyState(state);
-  if (lastSubmittedState === stateText || lastSubmittedState === 'blank') return;
-  console.log(lastSubmittedState, stateText);
+  if (lastSubmittedState === stateText) return;
+  console.log('Submitting new state:', stateText);
   await client.setUserProperty('com.yrambler2001.jira-tracker', stateText);
+  lastSubmittedState = stateText;
 };
 
 // --- Main App Component ---
@@ -673,9 +795,12 @@ export default function App() {
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
 
-  const [state, setState] = useState<State | undefined>(null);
+  const [state, setState] = useState<State>({ trackedTickets: {} });
+
   useEffect(() => {
-    if (client) submitState({ state, client });
+    if (client && state) {
+      submitState({ state, client });
+    }
   }, [client, state]);
 
   // Load settings from localStorage on initial render
@@ -686,15 +811,26 @@ export default function App() {
     }
   }, []);
 
-  // Update current time every 30 seconds for "ago" text
+  // Update current time every second for tracking timers
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(moment());
-    }, 30000); // 30 seconds
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch data when date changes
+  const fetchWorklogs = useCallback(() => {
+    if (!client) return;
+    client
+      .getLogsForDay(moment(selectedDate).format('YYYY-MM-DD'))
+      .then((data) => {
+        setBackendData(data);
+        window.backendData = data;
+      })
+      .catch((err) => console.error('Failed to fetch logs:', err));
+  }, [client, selectedDate]);
+
+  // Fetch data when date changes or client is initialized
   useEffect(() => {
     if (!settings.email || !settings.jiraToken) return;
     JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then(async (client) => {
@@ -705,15 +841,8 @@ export default function App() {
   }, [settings?.email, settings?.jiraToken]);
 
   useEffect(() => {
-    if (!client) return;
-    client
-      .getLogsForDay(moment(selectedDate).format('YYYY-MM-DD'))
-      .then((data) => {
-        setBackendData(data);
-        window.backendData = data;
-      })
-      .catch((err) => console.error('Failed to fetch logs:', err));
-  }, [client, selectedDate]);
+    fetchWorklogs();
+  }, [fetchWorklogs]);
 
   const jiraTimelogs = useMemo(() => backendData || [], [backendData]);
 
@@ -728,26 +857,51 @@ export default function App() {
         startDateMoment: start,
         endDate: end.toDate(),
         endDateMoment: end,
-        startDateString: `${start.format('YYYY-MM-DD HH:mm:ss')} (${formatDuration(start, currentTime)} ago)`,
-        endDateString: `${end.format('YYYY-MM-DD HH:mm:ss')} (${formatDuration(end, currentTime)} ago)`,
+        startDateString: `${start.format('YYYY-MM-DD HH:mm:ss')} (${start.from(currentTime)})`,
+        endDateString: `${end.format('YYYY-MM-DD HH:mm:ss')} (${end.from(currentTime)})`,
         startDateDisplay: (
           <>
-            {start.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(start, currentTime)} ago)</span>
+            {start.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({start.from(currentTime)})</span>
           </>
         ),
         endDateDisplay: (
           <>
-            {end.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(end, currentTime)} ago)</span>
+            {end.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({end.from(currentTime)})</span>
           </>
         ),
         durationString: formatDuration(start, end),
         workDescription: extractTextFromAtlassianDocumentFormat(log.worklog.comment),
+        isTracking: false,
       };
     });
 
-    if (logsWithDates.length === 0) {
+    const trackedTickets: TrackedTicket[] = Object.entries(state.trackedTickets).map(([key, value]) => {
+      const start = moment(value.startTime);
       return {
-        logsWithDates: [],
+        id: `tracking-${key}`,
+        issue: {
+          key,
+          fields: {
+            summary: value.summary,
+          },
+        },
+        startDate: start.toDate(),
+        startDateMoment: start,
+        startDateDisplay: (
+          <>
+            {start.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({start.from(currentTime)})</span>
+          </>
+        ),
+        durationString: formatDuration(start, currentTime),
+        isTracking: true,
+      };
+    });
+
+    const allLogs = [...logsWithDates, ...trackedTickets];
+
+    if (allLogs.length === 0) {
+      return {
+        allLogs: [],
         groupedLogs: {},
         uniqueTickets: [],
         ticketColors: {},
@@ -775,7 +929,7 @@ export default function App() {
 
     if (settings.displayOnNewLine) {
       return {
-        logsWithDates,
+        allLogs,
         groupedLogs: {},
         uniqueTickets: logsWithDates.map((log) => log.id),
         ticketColors,
@@ -794,10 +948,10 @@ export default function App() {
       {} as Record<string, ProcessedTimelog[]>,
     );
     const uniqueTickets = Object.keys(groupedLogs);
-    return { logsWithDates, groupedLogs, uniqueTickets, ticketColors, minDate, maxDate, maxDateMinDateDuration, xAxisTicks, displayMode: 'grouped' };
-  }, [jiraTimelogs, selectedDate, settings.displayOnNewLine, currentTime]);
+    return { allLogs, groupedLogs, uniqueTickets, ticketColors, minDate, maxDate, maxDateMinDateDuration, xAxisTicks, displayMode: 'grouped' };
+  }, [jiraTimelogs, selectedDate, settings.displayOnNewLine, currentTime, state.trackedTickets]);
 
-  const { logsWithDates, groupedLogs, uniqueTickets, ticketColors, minDate, maxDateMinDateDuration, xAxisTicks, displayMode } = timelineData;
+  const { allLogs, groupedLogs, uniqueTickets, ticketColors, minDate, maxDateMinDateDuration, xAxisTicks, displayMode } = timelineData;
 
   const handleRowClick = useCallback((log: ProcessedTimelog) => {
     setEditingLog(log);
@@ -810,6 +964,57 @@ export default function App() {
     setAddLogModalOpen(true); // Open add log modal
   }, []);
 
+  const handleStartTracking = useCallback((ticket: JiraTicket) => {
+    setState((currentState) => {
+      const newTrackedTickets = {
+        ...currentState.trackedTickets,
+        [ticket.key]: {
+          startTime: moment().toISOString(),
+          summary: ticket.summary,
+        },
+      };
+      return { ...currentState, trackedTickets: newTrackedTickets };
+    });
+  }, []);
+
+  const handleDiscardTracking = useCallback((ticketKey: string) => {
+    setState((currentState) => {
+      const newTrackedTickets = { ...currentState.trackedTickets };
+      delete newTrackedTickets[ticketKey];
+      return { ...currentState, trackedTickets: newTrackedTickets };
+    });
+  }, []);
+
+  const handleStopTracking = useCallback(
+    async (ticketKey: string) => {
+      if (!client || !state.trackedTickets[ticketKey]) return;
+
+      const trackingInfo = state.trackedTickets[ticketKey];
+      const startTime = moment(trackingInfo.startTime);
+      const endTime = moment();
+      const timeSpentSeconds = endTime.diff(startTime, 'seconds');
+
+      if (timeSpentSeconds < 60) {
+        alert('Tracked time is less than a minute. Worklog will not be submitted.');
+        handleDiscardTracking(ticketKey);
+        return;
+      }
+
+      try {
+        await client.addWorklog(ticketKey, {
+          started: startTime.toISOString(),
+          timeSpentSeconds,
+          comment: '',
+        });
+        handleDiscardTracking(ticketKey); // Remove from tracking state
+        fetchWorklogs(); // Refetch to show the new log
+      } catch (error) {
+        console.error('Failed to submit worklog:', error);
+      }
+    },
+    [client, state.trackedTickets, handleDiscardTracking, fetchWorklogs],
+  );
+
   const formatDateForInput = (date: Date | null) => {
     if (!date) return '';
     return moment(date).format('YYYY-MM-DD');
@@ -820,9 +1025,15 @@ export default function App() {
       <style>{` .timeline-grid { background-size: 20% 100%; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px); } .dark .timeline-grid { background-image: linear-gradient(to right, #4b5563 1px, transparent 1px); } .timeline-bar { transition: all 0.2s ease-in-out; overflow: visible; } .timeline-bar:hover { z-index: 10; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); } .timeline-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.2s; } .timeline-bar:hover .timeline-tooltip { visibility: visible; opacity: 1; } `}</style>
 
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={setSettings} />
-      <EditTimelogModal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} log={editingLog} />
-      <SearchModal isOpen={isSearchModalOpen} onClose={() => setSearchModalOpen(false)} onAddLog={handleAddLog} />
-      <AddTimelogModal isOpen={isAddLogModalOpen} onClose={() => setAddLogModalOpen(false)} ticket={ticketForAddLog} />
+      <EditTimelogModal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} log={editingLog} client={client} onUpdate={fetchWorklogs} />
+      <SearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onAddLog={handleAddLog}
+        onStartTracking={handleStartTracking}
+        client={client}
+      />
+      <AddTimelogModal isOpen={isAddLogModalOpen} onClose={() => setAddLogModalOpen(false)} ticket={ticketForAddLog} client={client} onUpdate={fetchWorklogs} />
 
       <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
         <div className="max-w-7xl mx-auto sticky top-4 z-10">
@@ -857,7 +1068,7 @@ export default function App() {
               </div>
             </div>
 
-            {logsWithDates.length > 0 ? (
+            {allLogs.length > 0 ? (
               <div className="w-full h-full text-sm">
                 <div className="grid grid-cols-[150px_1fr]">
                   <div className="pr-4 border-r border-gray-200 dark:border-gray-700">
@@ -867,15 +1078,17 @@ export default function App() {
                             {ticketName}
                           </div>
                         ))
-                      : logsWithDates.map((log) => (
-                          <div
-                            key={log.id}
-                            className="h-16 flex items-center font-medium text-gray-700 dark:text-gray-300 truncate"
-                            title={`${log.issue.key}: ${log.issue.fields.summary}`}
-                          >
-                            {log.issue.key}
-                          </div>
-                        ))}
+                      : allLogs
+                          .filter((log) => !log.isTracking)
+                          .map((log) => (
+                            <div
+                              key={log.id}
+                              className="h-16 flex items-center font-medium text-gray-700 dark:text-gray-300 truncate"
+                              title={`${log.issue.key}: ${log.issue.fields.summary}`}
+                            >
+                              {log.issue.key}
+                            </div>
+                          ))}
                   </div>
                   <div className="relative pl-4">
                     <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
@@ -902,21 +1115,23 @@ export default function App() {
                               ))}
                             </div>
                           ))
-                        : logsWithDates.map((log) => (
-                            <div key={log.id} className="h-16 relative border-b border-gray-200 dark:border-gray-700">
-                              <TimelineBar
-                                key={log.id}
-                                log={log}
-                                minDate={minDate}
-                                maxDateMinDateDuration={maxDateMinDateDuration}
-                                color={ticketColors[log.issue.key]}
-                                isHovered={hoveredLogId === log.id}
-                                onMouseEnter={() => setHoveredLogId(log.id)}
-                                onMouseLeave={() => setHoveredLogId(null)}
-                                onClick={() => handleRowClick(log)}
-                              />
-                            </div>
-                          ))}
+                        : allLogs
+                            .filter((log) => !log.isTracking)
+                            .map((log) => (
+                              <div key={log.id} className="h-16 relative border-b border-gray-200 dark:border-gray-700">
+                                <TimelineBar
+                                  key={log.id}
+                                  log={log as ProcessedTimelog}
+                                  minDate={minDate}
+                                  maxDateMinDateDuration={maxDateMinDateDuration}
+                                  color={ticketColors[log.issue.key]}
+                                  isHovered={hoveredLogId === log.id}
+                                  onMouseEnter={() => setHoveredLogId(log.id)}
+                                  onMouseLeave={() => setHoveredLogId(null)}
+                                  onClick={() => handleRowClick(log as ProcessedTimelog)}
+                                />
+                              </div>
+                            ))}
                     </div>
                   </div>
                 </div>
@@ -929,8 +1144,15 @@ export default function App() {
           </div>
         </div>
 
-        {logsWithDates.length > 0 && (
-          <TimelineTable logs={logsWithDates} hoveredLogId={hoveredLogId} setHoveredLogId={setHoveredLogId} onRowClick={handleRowClick} />
+        {allLogs.length > 0 && (
+          <TimelineTable
+            logs={allLogs}
+            hoveredLogId={hoveredLogId}
+            setHoveredLogId={setHoveredLogId}
+            onRowClick={handleRowClick}
+            onStopTracking={handleStopTracking}
+            onDiscardTracking={handleDiscardTracking}
+          />
         )}
 
         <footer className="text-center py-8 text-gray-500 dark:text-gray-400">
