@@ -33,7 +33,6 @@ interface ProcessedTimelog extends JiraTimelog {
 interface Settings {
   jiraToken: string;
   email: string;
-  propertiesTicket: string;
   displayOnNewLine: boolean;
 }
 
@@ -258,16 +257,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
           >
             How to create an API token
           </a>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Jira Ticket for Properties</label>
-          <input
-            type="text"
-            value={localSettings.propertiesTicket}
-            onChange={(e) => setLocalSettings({ ...localSettings, propertiesTicket: e.target.value })}
-            className="mt-1 block w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-            placeholder="Leave empty unless instructed otherwise"
-          />
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Display each item on a new line</span>
@@ -682,7 +671,7 @@ export default function App() {
   const [ticketForAddLog, setTicketForAddLog] = useState<JiraTicket | null>(null);
 
   // State for settings
-  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', propertiesTicket: '', displayOnNewLine: false });
+  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
 
   const [state, setState] = useState<State | undefined>(null);
   useEffect(() => {
