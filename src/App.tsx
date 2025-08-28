@@ -1008,16 +1008,16 @@ export default function App() {
         startDateMoment: start,
         endDate: end.toDate(),
         endDateMoment: end,
-        startDateString: `${start.format('YYYY-MM-DD HH:mm:ss')} (${start.from(currentTime)})`,
-        endDateString: `${end.format('YYYY-MM-DD HH:mm:ss')} (${end.from(currentTime)})`,
+        startDateString: `${start.format('YYYY-MM-DD HH:mm:ss')} (${formatDuration(start, currentTime)} ago)`,
+        endDateString: `${end.format('YYYY-MM-DD HH:mm:ss')} (${formatDuration(end, currentTime)} ago)`,
         startDateDisplay: (
           <>
-            {start.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({start.from(currentTime)})</span>
+            {start.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(start, currentTime)} ago)</span>
           </>
         ),
         endDateDisplay: (
           <>
-            {end.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({end.from(currentTime)})</span>
+            {end.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(end, currentTime)} ago)</span>
           </>
         ),
         durationString: formatDuration(start, end),
