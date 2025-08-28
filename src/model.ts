@@ -28,6 +28,18 @@ interface JiraWorklog {
   started: string;
   timeSpentSeconds: number;
   author?: JiraUserRef;
+  // Add comment field for creation/update
+  comment?: {
+    type: 'doc';
+    version: 1;
+    content: {
+      type: 'paragraph';
+      content: {
+        type: 'text';
+        text: string;
+      }[];
+    }[];
+  };
 }
 
 interface JiraWorklogPage {
@@ -60,6 +72,25 @@ interface JiraSearchResponse {
   issues: JiraIssue[];
 }
 
+// Interface for the Issue Picker response
+interface JiraIssuePickerIssue {
+  key: string;
+  keyHtml: string;
+  summary: string;
+  summaryText: string;
+}
+
+interface JiraIssuePickerSection {
+  label: string;
+  sub: string;
+  id: string;
+  issues: JiraIssuePickerIssue[];
+}
+
+interface JiraIssuePickerResponse {
+  sections: JiraIssuePickerSection[];
+}
+
 type MsEpoch = number;
 
 interface SearchIssuesParams {
@@ -86,7 +117,7 @@ export interface JiraAuthConfig {
  * A client for interacting with the Jira Cloud REST API, containing all related logic.
  */
 export class JiraApiClient {
-private static instance: JiraApiClient;
+  private static instance: JiraApiClient;
 
   // Properties are now 'readonly' as they are set once at initialization.
   private readonly email: string;
@@ -447,6 +478,205 @@ private static instance: JiraApiClient;
     }
   }
 
+  // --- NEW WORKLOG METHODS ---
+
+  /**
+   * Adds a worklog to an issue.
+   * @param issueIdOrKey The ID or key of the issue.
+   * @param worklog The worklog data to add.
+   * @returns The created worklog.
+   */
+  async addWorklog(issueIdOrKey: string, worklog: { started: string; timeSpentSeconds: number; comment?: string }): Promise<JiraWorklog> {
+    const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog`;
+    const body: any = {
+      timeSpentSeconds: worklog.timeSpentSeconds,
+      started: worklog.started,
+    };
+
+    if (worklog.comment) {
+      body.comment = {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: worklog.comment,
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: this.authHeader,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add worklog: ${response.status} ${await response.text()}`);
+      }
+      return (await response.json()) as JiraWorklog;
+    } catch (error) {
+      console.error(`Error adding worklog to issue '${issueIdOrKey}':`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Updates an existing worklog.
+   * @param issueIdOrKey The ID or key of the issue.
+   * @param worklogId The ID of the worklog to update.
+   * @param worklog The worklog data to update.
+   * @returns The updated worklog.
+   */
+  async updateWorklog(
+    issueIdOrKey: string,
+    worklogId: string,
+    worklog: { started?: string; timeSpentSeconds?: number; comment?: string },
+  ): Promise<JiraWorklog> {
+    const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog/${worklogId}`;
+    const body: any = {
+      timeSpentSeconds: worklog.timeSpentSeconds,
+      started: worklog.started,
+    };
+
+    if (worklog.comment) {
+      body.comment = {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: worklog.comment,
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: this.authHeader,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update worklog: ${response.status} ${await response.text()}`);
+      }
+      return (await response.json()) as JiraWorklog;
+    } catch (error) {
+      console.error(`Error updating worklog '${worklogId}' on issue '${issueIdOrKey}':`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a worklog from an issue.
+   * @param issueIdOrKey The ID or key of the issue.
+   * @param worklogId The ID of the worklog to delete.
+   */
+  async deleteWorklog(issueIdOrKey: string, worklogId: string): Promise<void> {
+    const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog/${worklogId}`;
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: this.authHeader,
+        },
+      });
+
+      if (response.status !== 204) {
+        throw new Error(`Failed to delete worklog: ${response.status} ${await response.text()}`);
+      }
+      console.log(`Worklog '${worklogId}' deleted successfully from issue '${issueIdOrKey}'.`);
+    } catch (error) {
+      console.error(`Error deleting worklog '${worklogId}' from issue '${issueIdOrKey}':`, error);
+      throw error;
+    }
+  }
+
+  // --- NEW SEARCH METHODS ---
+
+  /**
+   * Searches for issues using a JQL query.
+   * @param jql The JQL query string.
+   * @param fields Optional array of fields to return for each issue.
+   * @param maxResults Optional maximum number of issues to return.
+   * @returns A promise that resolves with the search results.
+   */
+  async searchIssuesByJql(jql: string, fields: string[] = ['*navigable'], maxResults: number = 50): Promise<JiraSearchResponse> {
+    const url = `${this.baseUrl}/rest/api/3/search/jql`;
+    const body = {
+      jql,
+      fields,
+      maxResults,
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: this.authHeader,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error(`JQL search failed: ${response.status} ${await response.text()}`);
+      }
+      return (await response.json()) as JiraSearchResponse;
+    } catch (error) {
+      console.error('Error in searchIssuesByJql:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Finds issues using the issue picker.
+   * This is useful for interactive search with type-ahead.
+   * @param query The search query.
+   * @returns A promise that resolves with the issue picker results.
+   */
+  async findIssuesWithPicker(query: string): Promise<JiraIssuePickerResponse> {
+    const url = `${this.baseUrl}/rest/api/3/issue/picker?query=${encodeURIComponent(query)}`;
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: this.authHeader,
+          Accept: 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Issue picker search failed: ${response.status} ${await response.text()}`);
+      }
+      return (await response.json()) as JiraIssuePickerResponse;
+    } catch (error) {
+      console.error('Error in findIssuesWithPicker:', error);
+      throw error;
+    }
+  }
+
   private async getServerTimezone(): Promise<number> {
     const res = await fetch(`${this.baseUrl}/rest/api/3/serverInfo`, {
       method: 'GET',
@@ -463,26 +693,15 @@ private static instance: JiraApiClient;
 
   private async searchIssues(params: SearchIssuesParams): Promise<JiraSearchResponse> {
     const { utcOffset, fetchTimelogStartedAfter, fetchTimelogStartedBefore } = params;
-    const url = `${this.baseUrl}/rest/api/3/search/jql`;
-    const body = {
-      jql: `worklogAuthor = currentUser() AND worklogDate >= "${moment(fetchTimelogStartedAfter)
-        .utcOffset(utcOffset)
-        .format('YYYY-MM-DD')}" AND worklogDate <= "${moment(fetchTimelogStartedBefore).utcOffset(utcOffset).format('YYYY-MM-DD')}"`,
-      fields: ['assignee', 'creator', 'issuetype', 'summary', 'priority', 'project', 'reporter', 'status', 'summary', 'worklog'],
-      maxResults: 5000,
-    };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: this.authHeader,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`JQL search failed: ${res.status} ${await res.text()}`);
-    return (await res.json()) as JiraSearchResponse;
+    // This is a specific implementation of search, we'll use the new generic one.
+    const jql = `worklogAuthor = currentUser() AND worklogDate >= "${moment(fetchTimelogStartedAfter)
+      .utcOffset(utcOffset)
+      .format('YYYY-MM-DD')}" AND worklogDate <= "${moment(fetchTimelogStartedBefore).utcOffset(utcOffset).format('YYYY-MM-DD')}"`;
+
+    const fields = ['assignee', 'creator', 'issuetype', 'summary', 'priority', 'project', 'reporter', 'status', 'summary', 'worklog'];
+
+    return this.searchIssuesByJql(jql, fields, 5000);
   }
 
   private async fetchPaginatedWorklogs(issueId: string, params: FetchPaginatedWorklogsParams): Promise<JiraWorklog[]> {
