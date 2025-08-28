@@ -178,6 +178,23 @@ const CalculatorIcon = () => (
   </svg>
 );
 
+const StarIcon = ({ filled }: { filled: boolean }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-5 w-5"
+  >
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+
 // --- Modal Components ---
 
 interface ModalProps {
@@ -185,9 +202,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  closeOnOutsideClick?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, closeOnOutsideClick = false }) => {
   const [isRendered, setIsRendered] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -205,7 +223,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   if (!isRendered) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex justify-center items-center ${isRendered ? 'visible' : 'invisible'}`} onClick={onClose}>
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${isRendered ? 'visible' : 'invisible'}`}
+      onClick={closeOnOutsideClick ? onClose : undefined}
+    >
       <div className={`absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`} />
       <div
         className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
@@ -506,18 +527,60 @@ const AddTimelogModal: React.FC<AddTimelogModalProps> = ({ isOpen, onClose, tick
   );
 };
 
+interface EditTrackingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  trackingInfo: { key: string; summary: string; startTime: string } | null;
+  client: JiraApiClient | null;
+  onUpdate: () => void;
+  onDiscard: (key: string) => void;
+}
+
+const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, trackingInfo, client, onUpdate, onDiscard }) => {
+  if (!trackingInfo || !client) return null;
+
+  const startMoment = moment(trackingInfo.startTime);
+  const endMoment = moment();
+
+  const initialData = {
+    startDateMoment: startMoment,
+    endDateMoment: endMoment,
+    durationString: formatDuration(startMoment, endMoment),
+    description: '',
+  };
+
+  const handleSave = async (data: any) => {
+    try {
+      await client.addWorklog(trackingInfo.key, data);
+      onUpdate();
+    } catch (error) {
+      console.error('Failed to add worklog:', error);
+    }
+    onClose();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Submit Time for ${trackingInfo.key}`}>
+      <TimelogForm initialData={initialData} onSave={handleSave} onDelete={() => onDiscard(trackingInfo.key)} buttonText="Submit Timelog" />
+    </Modal>
+  );
+};
+
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddLog: (ticket: JiraTicket) => void;
   onStartTracking: (ticket: JiraTicket) => void;
   client: JiraApiClient | null;
+  starredTickets: string[];
+  toggleStar: (key: string) => void;
 }
 
-const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, onStartTracking, client }) => {
+const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, onStartTracking, client, starredTickets, toggleStar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JiraTicket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchByKey, setSearchByKey] = useState(true);
 
   useEffect(() => {
     if (!isOpen) {
@@ -529,10 +592,12 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     const handler = setTimeout(() => {
       if (searchTerm.length > 2 && client) {
         setIsLoading(true);
+        const jql = searchByKey ? `key = "${searchTerm.toUpperCase()}"` : `text ~ "${searchTerm}" order by project asc, key desc`;
+
         client
-          .findIssuesWithPicker(searchTerm)
+          .searchIssuesByJql(jql)
           .then((response) => {
-            const tickets = response.sections.flatMap((section) => section.issues.map((issue) => ({ key: issue.key, summary: issue.summaryText })));
+            const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary }));
             setSearchResults(tickets);
           })
           .catch((err) => console.error('Search failed:', err))
@@ -545,7 +610,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, client, isOpen]);
+  }, [searchTerm, client, isOpen, searchByKey]);
 
   const handleStartTracking = (ticket: JiraTicket) => {
     onStartTracking(ticket);
@@ -555,14 +620,24 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Search Jira Ticket">
       <div className="space-y-4">
-        <input
-          type="text"
-          placeholder="Search by ticket number or summary..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-          autoFocus
-        />
+        <div className="flex items-center gap-4">
+          <input
+            type="text"
+            placeholder={searchByKey ? 'Search by ticket key...' : 'Search by text...'}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+            autoFocus
+          />
+          <div className="flex items-center">
+            <span className="text-sm mr-2">Key</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={!searchByKey} onChange={() => setSearchByKey(!searchByKey)} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+            </label>
+            <span className="text-sm ml-2">Text</span>
+          </div>
+        </div>
         <div className="max-h-60 overflow-y-auto">
           {isLoading && <div className="p-2 text-center text-gray-500">Searching...</div>}
           {!isLoading &&
@@ -572,7 +647,10 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
                   <div className="font-semibold text-blue-600 dark:text-blue-400">{ticket.key}</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">{ticket.summary}</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <button onClick={() => toggleStar(ticket.key)}>
+                    <StarIcon filled={starredTickets.includes(ticket.key)} />
+                  </button>
                   <button onClick={() => handleStartTracking(ticket)} className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded">
                     Start Tracking
                   </button>
@@ -647,14 +725,34 @@ interface TimelineTableProps {
   onRowClick: (log: ProcessedTimelog) => void;
   onStopTracking: (ticketKey: string) => void;
   onDiscardTracking: (ticketKey: string) => void;
+  onStartTracking: (ticket: JiraTicket) => void;
+  onAddLog: (ticket: JiraTicket) => void;
+  onDeleteLog: (log: ProcessedTimelog) => void;
+  starredTickets: string[];
+  toggleStar: (key: string) => void;
 }
-const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHoveredLogId, onRowClick, onStopTracking, onDiscardTracking }) => (
+const TimelineTable: React.FC<TimelineTableProps> = ({
+  logs,
+  hoveredLogId,
+  setHoveredLogId,
+  onRowClick,
+  onStopTracking,
+  onDiscardTracking,
+  onStartTracking,
+  onAddLog,
+  onDeleteLog,
+  starredTickets,
+  toggleStar,
+}) => (
   <div className="mt-8 max-w-7xl mx-auto">
     <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Timelog Details</h2>
     <div className="shadow border-b border-gray-200 dark:border-gray-700 sm:rounded-lg overflow-hidden">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
+            <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              Star
+            </th>
             <th scope="col" className="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Ticket ID
             </th>
@@ -673,7 +771,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
             <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Duration
             </th>
-            <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-auto px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Actions
             </th>
           </tr>
@@ -687,6 +785,16 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
               onMouseLeave={() => setHoveredLogId(null)}
               onClick={() => !log.isTracking && onRowClick(log as ProcessedTimelog)}
             >
+              <td className="px-6 py-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleStar(log.issue.key);
+                  }}
+                >
+                  <StarIcon filled={starredTickets.includes(log.issue.key)} />
+                </button>
+              </td>
               <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">{log.issue.key}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.issue.fields.summary}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">
@@ -696,7 +804,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{!log.isTracking ? (log as ProcessedTimelog).endDateDisplay : ''}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{log.durationString}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                {log.isTracking && (
+                {log.isTracking ? (
                   <div className="flex gap-2">
                     <button
                       onClick={(e) => {
@@ -717,6 +825,45 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
                       Discard
                     </button>
                   </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartTracking({ key: log.issue.key, summary: log.issue.fields.summary });
+                      }}
+                      className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Start
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddLog({ key: log.issue.key, summary: log.issue.fields.summary });
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRowClick(log as ProcessedTimelog);
+                      }}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteLog(log as ProcessedTimelog);
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>
@@ -734,6 +881,7 @@ interface State {
       summary: string;
     };
   };
+  starredTickets: string[];
 }
 
 const parseState = (state: string) => {
@@ -743,8 +891,9 @@ const parseState = (state: string) => {
   } catch (e) {
     console.error('can not parse data ', e);
   }
-  if (!parsed || typeof parsed !== 'object') parsed = { trackedTickets: {} };
+  if (!parsed || typeof parsed !== 'object') parsed = { trackedTickets: {}, starredTickets: [] };
   if (!parsed.trackedTickets) parsed.trackedTickets = {};
+  if (!parsed.starredTickets) parsed.starredTickets = [];
   return parsed as State;
 };
 const stringifyState = (state: State) => {
@@ -788,14 +937,16 @@ export default function App() {
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [isSearchModalOpen, setSearchModalOpen] = useState(false);
   const [isAddLogModalOpen, setAddLogModalOpen] = useState(false);
+  const [isEditTrackingModalOpen, setEditTrackingModalOpen] = useState(false);
 
   const [editingLog, setEditingLog] = useState<ProcessedTimelog | null>(null);
   const [ticketForAddLog, setTicketForAddLog] = useState<JiraTicket | null>(null);
+  const [editingTrackingInfo, setEditingTrackingInfo] = useState<{ key: string; summary: string; startTime: string } | null>(null);
 
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
 
-  const [state, setState] = useState<State>({ trackedTickets: {} });
+  const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [] });
 
   useEffect(() => {
     if (client && state) {
@@ -983,37 +1134,47 @@ export default function App() {
       delete newTrackedTickets[ticketKey];
       return { ...currentState, trackedTickets: newTrackedTickets };
     });
+    setEditTrackingModalOpen(false);
   }, []);
 
   const handleStopTracking = useCallback(
-    async (ticketKey: string) => {
+    (ticketKey: string) => {
       if (!client || !state.trackedTickets[ticketKey]) return;
 
       const trackingInfo = state.trackedTickets[ticketKey];
-      const startTime = moment(trackingInfo.startTime);
-      const endTime = moment();
-      const timeSpentSeconds = endTime.diff(startTime, 'seconds');
+      setEditingTrackingInfo({
+        key: ticketKey,
+        summary: trackingInfo.summary,
+        startTime: trackingInfo.startTime,
+      });
+      setEditTrackingModalOpen(true);
+    },
+    [client, state.trackedTickets],
+  );
 
-      if (timeSpentSeconds < 60) {
-        alert('Tracked time is less than a minute. Worklog will not be submitted.');
-        handleDiscardTracking(ticketKey);
-        return;
-      }
-
-      try {
-        await client.addWorklog(ticketKey, {
-          started: startTime.toISOString(),
-          timeSpentSeconds,
-          comment: '',
-        });
-        handleDiscardTracking(ticketKey); // Remove from tracking state
-        fetchWorklogs(); // Refetch to show the new log
-      } catch (error) {
-        console.error('Failed to submit worklog:', error);
+  const handleDeleteLog = useCallback(
+    async (log: ProcessedTimelog) => {
+      if (!client) return;
+      if (window.confirm(`Are you sure you want to delete this worklog for ${log.issue.key}?`)) {
+        try {
+          await client.deleteWorklog(log.issue.key, log.id);
+          fetchWorklogs();
+        } catch (error) {
+          console.error('Failed to delete worklog:', error);
+        }
       }
     },
-    [client, state.trackedTickets, handleDiscardTracking, fetchWorklogs],
+    [client, fetchWorklogs],
   );
+
+  const toggleStar = useCallback((key: string) => {
+    setState((currentState) => {
+      const starredTickets = currentState.starredTickets.includes(key)
+        ? currentState.starredTickets.filter((k) => k !== key)
+        : [...currentState.starredTickets, key];
+      return { ...currentState, starredTickets };
+    });
+  }, []);
 
   const formatDateForInput = (date: Date | null) => {
     if (!date) return '';
@@ -1032,8 +1193,23 @@ export default function App() {
         onAddLog={handleAddLog}
         onStartTracking={handleStartTracking}
         client={client}
+        starredTickets={state.starredTickets}
+        toggleStar={toggleStar}
       />
       <AddTimelogModal isOpen={isAddLogModalOpen} onClose={() => setAddLogModalOpen(false)} ticket={ticketForAddLog} client={client} onUpdate={fetchWorklogs} />
+      <EditTrackingModal
+        isOpen={isEditTrackingModalOpen}
+        onClose={() => setEditTrackingModalOpen(false)}
+        trackingInfo={editingTrackingInfo}
+        client={client}
+        onUpdate={() => {
+          if (editingTrackingInfo) {
+            handleDiscardTracking(editingTrackingInfo.key);
+          }
+          fetchWorklogs();
+        }}
+        onDiscard={(key) => handleDiscardTracking(key)}
+      />
 
       <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
         <div className="max-w-7xl mx-auto sticky top-4 z-10">
@@ -1152,6 +1328,11 @@ export default function App() {
             onRowClick={handleRowClick}
             onStopTracking={handleStopTracking}
             onDiscardTracking={handleDiscardTracking}
+            onStartTracking={handleStartTracking}
+            onAddLog={handleAddLog}
+            onDeleteLog={handleDeleteLog}
+            starredTickets={state.starredTickets}
+            toggleStar={toggleStar}
           />
         )}
 
