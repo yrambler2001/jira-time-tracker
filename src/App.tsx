@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import _ from 'lodash';
 import moment from 'moment';
-import { getLogsForDay } from './model';
+import { JiraApiClient } from './model';
 
 // Makes sure global libraries are available for debugging if needed
 window.moment = moment;
@@ -627,6 +627,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({ logs, hoveredLogId, setHo
 
 // --- Main App Component ---
 export default function App() {
+  const [client, setClient] = useState<JiraApiClient | null>(null);
   const [backendData, setBackendData] = useState<any>(undefined);
   const [selectedDate, setSelectedDate] = useState<Date>(moment().toDate());
   const [hoveredLogId, setHoveredLogId] = useState<string | null>(null);
@@ -663,13 +664,22 @@ export default function App() {
   // Fetch data when date changes
   useEffect(() => {
     if (!settings.email || !settings.jiraToken) return;
-    getLogsForDay({ day: moment(selectedDate).format('YYYY-MM-DD'), email: settings.email, apiToken: settings.jiraToken })
+    JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then((client) => {
+      setClient(client);
+      window.client = client;
+    });
+  }, [settings?.email, settings?.jiraToken]);
+
+  useEffect(() => {
+    if (!client) return;
+    client
+      .getLogsForDay(moment(selectedDate).format('YYYY-MM-DD'))
       .then((data) => {
         setBackendData(data);
         window.backendData = data;
       })
       .catch((err) => console.error('Failed to fetch logs:', err));
-  }, [selectedDate, settings.email, settings.jiraToken]);
+  }, [client, selectedDate]);
 
   const jiraTimelogs = useMemo(() => backendData || [], [backendData]);
 
