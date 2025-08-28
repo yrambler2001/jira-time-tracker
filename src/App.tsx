@@ -882,6 +882,7 @@ interface State {
     };
   };
   starredTickets: string[];
+  isDefault?: boolean
 }
 
 const parseState = (state: string) => {
@@ -919,6 +920,7 @@ const init = async ({ setState, client }: InitProps) => {
 const submitState = async ({ state, client }: SubmitStateProps) => {
   const stateText = stringifyState(state);
   if (lastSubmittedState === stateText) return;
+  if (state.isDefault) return;
   console.log('Submitting new state:', stateText);
   await client.setUserProperty('com.yrambler2001.jira-tracker', stateText);
   lastSubmittedState = stateText;
@@ -946,7 +948,7 @@ export default function App() {
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
 
-  const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [] });
+  const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [], isDefault: true });
 
   useEffect(() => {
     if (client && state) {
