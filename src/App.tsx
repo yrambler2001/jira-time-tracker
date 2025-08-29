@@ -530,10 +530,10 @@ const AddTimelogModal: React.FC<AddTimelogModalProps> = ({ isOpen, onClose, tick
 interface EditTrackingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  trackingInfo: { key: string; summary: string; startTime: string } | null;
+  trackingInfo: { id: string; key: string; summary: string; startTime: string } | null;
   client: JiraApiClient | null;
   onUpdate: () => void;
-  onDiscard: (key: string) => void;
+  onDiscard: (id: string) => void;
 }
 
 const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, trackingInfo, client, onUpdate, onDiscard }) => {
@@ -561,7 +561,7 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Submit Time for ${trackingInfo.key}`}>
-      <TimelogForm initialData={initialData} onSave={handleSave} onDelete={() => onDiscard(trackingInfo.key)} buttonText="Submit Timelog" />
+      <TimelogForm initialData={initialData} onSave={handleSave} onDelete={() => onDiscard(trackingInfo.id)} buttonText="Submit Timelog" />
     </Modal>
   );
 };
@@ -723,8 +723,8 @@ interface TimelineTableProps {
   hoveredLogId: string | null;
   setHoveredLogId: (id: string | null) => void;
   onRowClick: (log: ProcessedTimelog) => void;
-  onStopTracking: (ticketKey: string) => void;
-  onDiscardTracking: (ticketKey: string) => void;
+  onStopTracking: (trackingId: string) => void;
+  onDiscardTracking: (trackingId: string) => void;
   onStartTracking: (ticket: JiraTicket) => void;
   onAddLog: (ticket: JiraTicket) => void;
   onDeleteLog: (log: ProcessedTimelog) => void;
@@ -809,7 +809,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onStopTracking(log.issue.key);
+                        onStopTracking(log.id);
                       }}
                       className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded"
                     >
@@ -818,7 +818,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDiscardTracking(log.issue.key);
+                        onDiscardTracking(log.id);
                       }}
                       className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded"
                     >
@@ -877,7 +877,8 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
 // --- State Management ---
 interface State {
   trackedTickets: {
-    [key: string]: {
+    [id: string]: {
+      key: string;
       startTime: string;
       summary: string;
     };
@@ -976,7 +977,7 @@ export default function App() {
 
   const [editingLog, setEditingLog] = useState<ProcessedTimelog | null>(null);
   const [ticketForAddLog, setTicketForAddLog] = useState<JiraTicket | null>(null);
-  const [editingTrackingInfo, setEditingTrackingInfo] = useState<{ key: string; summary: string; startTime: string } | null>(null);
+  const [editingTrackingInfo, setEditingTrackingInfo] = useState<{ id: string; key: string; summary: string; startTime: string } | null>(null);
 
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
@@ -1057,12 +1058,12 @@ export default function App() {
       };
     });
 
-    const trackedTickets: TrackedTicket[] = Object.entries(state.trackedTickets).map(([key, value]) => {
+    const trackedTickets: TrackedTicket[] = Object.entries(state.trackedTickets).map(([id, value]) => {
       const start = moment(value.startTime);
       return {
-        id: `tracking-${key}`,
+        id: id,
         issue: {
-          key,
+          key: value.key,
           fields: {
             summary: value.summary,
           },
@@ -1151,9 +1152,11 @@ export default function App() {
       if (!client) return;
 
       const updater: StateUpdater = (currentState) => {
+        const newTrackingId = crypto.randomUUID();
         const newTrackedTickets = {
           ...currentState.trackedTickets,
-          [ticket.key]: {
+          [newTrackingId]: {
+            key: ticket.key,
             startTime: moment().toISOString(),
             summary: ticket.summary,
           },
@@ -1168,12 +1171,12 @@ export default function App() {
   );
 
   const handleDiscardTracking = useCallback(
-    async (ticketKey: string) => {
+    async (trackingId: string) => {
       if (!client) return;
 
       const updater: StateUpdater = (currentState) => {
         const newTrackedTickets = { ...currentState.trackedTickets };
-        delete newTrackedTickets[ticketKey];
+        delete newTrackedTickets[trackingId];
         return { ...currentState, trackedTickets: newTrackedTickets };
       };
 
@@ -1185,12 +1188,13 @@ export default function App() {
   );
 
   const handleStopTracking = useCallback(
-    (ticketKey: string) => {
-      if (!client || !state.trackedTickets[ticketKey]) return;
+    (trackingId: string) => {
+      if (!client || !state.trackedTickets[trackingId]) return;
 
-      const trackingInfo = state.trackedTickets[ticketKey];
+      const trackingInfo = state.trackedTickets[trackingId];
       setEditingTrackingInfo({
-        key: ticketKey,
+        id: trackingId,
+        key: trackingInfo.key,
         summary: trackingInfo.summary,
         startTime: trackingInfo.startTime,
       });
@@ -1259,11 +1263,11 @@ export default function App() {
         client={client}
         onUpdate={() => {
           if (editingTrackingInfo) {
-            handleDiscardTracking(editingTrackingInfo.key);
+            handleDiscardTracking(editingTrackingInfo.id);
           }
           fetchWorklogs();
         }}
-        onDiscard={(key) => handleDiscardTracking(key)}
+        onDiscard={(id) => handleDiscardTracking(id)}
       />
 
       <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
@@ -1331,7 +1335,7 @@ export default function App() {
                       {displayMode === 'grouped'
                         ? uniqueTickets.map((ticketName) => (
                             <div key={ticketName} className="h-16 relative border-b border-gray-200 dark:border-gray-700">
-                              {groupedLogs[ticketName].map((log) => (
+                              {groupedLogs[ticketName].map((log: ProcessedTimelog) => (
                                 <TimelineBar
                                   key={log.id}
                                   log={log}
