@@ -1,69 +1,99 @@
-# React + TypeScript + Vite
+# Jira Time Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This application is designed to help you easily track and visualize your time spent on Jira tickets. With an intuitive interface, you can start and stop timers, manually add and edit worklogs, and get a clear overview of your daily and weekly progress.
 
-Currently, two official plugins are available:
+## Getting Started: Initial Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Before you can start tracking time, you need to connect the application to your Jira account.
 
-## Expanding the ESLint configuration
+1.  Click on the **Settings** icon (⚙️) in the top-right corner of the dashboard.
+2.  In the Settings modal, you will need to provide the following information:
+    - **Jira Subdomain**: This is the unique part of your organization's Jira URL. For example, if your Jira URL is `https://my-company.atlassian.net`, your subdomain is `my-company`.
+    - **Your Email**: The email address you use for your Jira account.
+    - **Jira API Token**: A personal access token for your Jira account. You can create one by following the instructions on the Atlassian website. For security reasons, this token is stored only in your browser's local storage.
+3.  Click **Save**. The application will then connect to your Jira account and fetch your data.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## The Dashboard
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The main dashboard provides a visual representation of your logged time for a selected day.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Timeline View
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+The central part of the dashboard is the timeline view, which shows your worklogs plotted on a timeline for the selected day.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **Grouped View**: By default, your timelogs are grouped by Jira project, giving you a consolidated view of your work.
+- **Individual View**: You can switch to an individual view where each timelog is displayed on its own line. This can be changed in the Settings modal by enabling "Display each item on a new line".
+- **Hover for Details**: Hover over any timelog in the timeline to see a tooltip with more details, including the ticket summary, start and end times, duration, and work description.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Navigating Dates
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Use the date picker at the top of the dashboard to select the day you want to view.
+- The "Total for Day" display shows the total time you have logged for the selected date.
+
+## Tracking Your Time
+
+There are two primary ways to log your time: using the real-time tracker or adding worklogs manually.
+
+### Live Time Tracking
+
+- **Start Tracking**:
+  - Click the **Search** icon (🔍) to open the ticket search modal.
+  - Find the ticket you want to work on and click the "Start Tracking" button.
+  - Alternatively, you can start tracking from the "Timelog Details" table by clicking the "Start" button on any existing log for that ticket.
+- **While Tracking**:
+  - An active timer will appear in the "Timelog Details" table at the bottom of the page.
+  - You can click on the active log to open a modal where you can edit the start time and add a work description while the timer is running.
+- **Stop Tracking**:
+  - Once you've finished your work, click the "Stop" button next to the active timer in the "Timelog Details" table.
+  - A modal will appear, allowing you to review and adjust the start time, end time, duration, and work description before submitting the worklog to Jira.
+- **Discarding a Timer**:
+  - If you started a timer by mistake, you can click the "Discard" button to delete it without saving a worklog.
+
+### Adding and Editing Worklogs
+
+- **Adding a Manual Worklog**:
+  - Click the **Search** icon (🔍) to find a ticket.
+  - Click the "Add Log" button next to the desired ticket in the search results.
+  - A form will appear where you can enter the Work Description, Start Time, End Time, and Duration.
+  - The form includes a handy auto-calculation feature. You can lock one of the time fields (start, end, or duration), and it will be automatically calculated based on the other two.
+- **Editing an Existing Worklog**:
+  - In the "Timelog Details" table, click on any worklog to open the edit modal.
+  - You can modify the time and work description and then click "Update Timelog" to save your changes.
+- **Deleting a Worklog**:
+  - When editing a worklog, you can click the "Delete" button to permanently remove it from Jira.
+
+## Finding Jira Tickets
+
+The integrated search functionality makes it easy to find the tickets you need.
+
+- **Search Modal**: Click the **Search** icon (🔍) to open the search modal.
+- **Search By**: You can search for tickets using different criteria:
+  - **Full Key**: e.g., "PROJ-123"
+  - **Summary**: Search for keywords in the ticket's summary (title).
+  - **Text**: A broader search that includes the summary, description, and comments.
+  - **My Tickets on Board**: Shows tickets assigned to you in open sprints.
+  - **JQL**: For advanced users, you can use a custom JQL query.
+- **Order By**: You can sort the search results by Key, Time Spent, Updated date, or Priority.
+
+## Starred Tickets
+
+- **Starring a Ticket**: Click the star icon (⭐) next to any ticket in the search results or the "Timelog Details" table to add it to your starred list.
+- **Quick Access**: Your starred tickets will appear by default when you open the search modal, giving you quick access to the tickets you work on most frequently.
+
+## Settings
+
+The settings modal allows you to customize your experience:
+
+- **Display each item on a new line**: As mentioned earlier, this changes the timeline view to show each worklog on its own line instead of grouping them by project.
+- You can also update your Jira Subdomain, Email, and API Token here.
+
+## Technologies Used
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Moment.js
+- Lodash
+- ESLint
+- Netlify Edge Functions
