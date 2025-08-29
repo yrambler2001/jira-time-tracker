@@ -67,7 +67,7 @@ function formatDuration(start: moment.Moment, end: moment.Moment): string {
   const minutes = duration.minutes();
   const seconds = duration.seconds();
   const parts = [];
-  if (hours > 0) parts.push(`${`${hours}`.padStart(2, '0')}:`);
+  /* if (hours > 0) */ parts.push(`${`${hours}`.padStart(2, '0')}:`);
   /* if (minutes > 0) */ parts.push(`${`${minutes}`.padStart(2, '0')}:`);
   /* if (seconds > 0) */ parts.push(`${`${seconds}`.padStart(2, '0')}`);
   if (parts.length === 0) return '00:00';
@@ -514,7 +514,7 @@ const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, lo
   const initialData = {
     startDateMoment: log.startDateMoment,
     endDateMoment: log.endDateMoment,
-    durationString: log.durationString,
+    durationString: formatSecondsToDuration(log.worklog.timeSpentSeconds),
     description: log.workDescription || '',
   };
 
@@ -587,11 +587,12 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
 
   const startMoment = moment(trackingInfo.startTime);
   const endMoment = moment();
+  const durationInSeconds = endMoment.diff(startMoment, 'seconds');
 
   const initialData = {
     startDateMoment: startMoment,
     endDateMoment: endMoment,
-    durationString: formatDuration(startMoment, endMoment),
+    durationString: formatSecondsToDuration(durationInSeconds),
     description: trackingInfo.workDescription || '',
   };
 
