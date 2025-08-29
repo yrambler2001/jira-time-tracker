@@ -874,6 +874,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
   </div>
 );
 
+// --- State Management ---
 interface State {
   trackedTickets: {
     [key: string]: {
@@ -882,48 +883,80 @@ interface State {
     };
   };
   starredTickets: string[];
-  isDefault?: boolean
+  isDefault?: boolean;
 }
 
-const parseState = (state: string) => {
+const JIRA_PROPERTY_KEY = 'com.yrambler2001.jira-tracker';
+
+const parseState = (state: string): State => {
   let parsed: State | null = null;
   try {
-    parsed = JSON.parse(state);
+    if (state) {
+      parsed = JSON.parse(state);
+    }
   } catch (e) {
-    console.error('can not parse data ', e);
+    console.error('Could not parse state from Jira user property', e);
   }
+  // Ensure the state object has the correct shape
   if (!parsed || typeof parsed !== 'object') parsed = { trackedTickets: {}, starredTickets: [] };
   if (!parsed.trackedTickets) parsed.trackedTickets = {};
   if (!parsed.starredTickets) parsed.starredTickets = [];
   return parsed as State;
 };
-const stringifyState = (state: State) => {
-  const stringified = JSON.stringify(state);
-  return stringified;
-};
-interface InitProps {
-  setState: (state: State) => void;
-  client: JiraApiClient;
-}
-interface SubmitStateProps {
-  state: State;
-  client: JiraApiClient;
-}
 
-let lastSubmittedState: string = 'blank';
-const init = async ({ setState, client }: InitProps) => {
-  const stateText = await client.getUserProperty('com.yrambler2001.jira-tracker');
-  const parsedState = parseState(stateText);
-  lastSubmittedState = stringifyState(parsedState);
-  setState(parsedState);
+const stringifyState = (state: State): string => {
+  // Create a clean state object for storing, removing transient properties
+  const stateToStore = {
+    trackedTickets: state.trackedTickets,
+    starredTickets: state.starredTickets,
+  };
+  return JSON.stringify(stateToStore);
 };
-const submitState = async ({ state, client }: SubmitStateProps) => {
-  const stateText = stringifyState(state);
-  if (lastSubmittedState === stateText) return;
-  if (state.isDefault) return;
-  console.log('Submitting new state:', stateText);
-  await client.setUserProperty('com.yrambler2001.jira-tracker', stateText);
-  lastSubmittedState = stateText;
+
+// --- Atomic State Update Logic ---
+
+/**
+ * A function that takes the current state and returns the new state.
+ */
+type StateUpdater = (currentState: State) => State;
+
+/**
+ * Performs an atomic read-modify-write operation on the Jira user property.
+ * This prevents race conditions when the app is open in multiple tabs.
+ * @param client The JiraApiClient instance.
+ * @param updater A function that applies a change to the current state.
+ * @returns The newly updated state.
+ */
+const updateJiraStateAtomically = async (client: JiraApiClient, updater: StateUpdater): Promise<State> => {
+  try {
+    // 1. READ: Fetch the latest state from Jira.
+    const currentStateText = await client.getUserProperty(JIRA_PROPERTY_KEY);
+    const currentState = parseState(currentStateText);
+
+    // 2. MODIFY: Apply the update logic to the current state.
+    const newState = updater(currentState);
+
+    // 3. WRITE: Set the new, updated state back to Jira.
+    const newStateText = stringifyState(newState);
+    await client.setUserProperty(JIRA_PROPERTY_KEY, newStateText);
+
+    console.log('Successfully submitted new state:', newStateText);
+    return newState;
+  } catch (error) {
+    console.error('Failed to update Jira state atomically:', error);
+    // In case of an error, we should probably re-fetch the state to ensure UI consistency
+    const currentStateText = await client.getUserProperty(JIRA_PROPERTY_KEY);
+    return parseState(currentStateText);
+  }
+};
+
+/**
+ * Initializes the app state from the Jira user property.
+ */
+const init = async (setState: React.Dispatch<React.SetStateAction<State>>, client: JiraApiClient) => {
+  const stateText = await client.getUserProperty(JIRA_PROPERTY_KEY);
+  const parsedState = parseState(stateText);
+  setState(parsedState);
 };
 
 // --- Main App Component ---
@@ -948,13 +981,8 @@ export default function App() {
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
 
+  // Local state for tracked/starred tickets, synced with Jira user property
   const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [], isDefault: true });
-
-  useEffect(() => {
-    if (client && state) {
-      submitState({ state, client });
-    }
-  }, [client, state]);
 
   // Load settings from localStorage on initial render
   useEffect(() => {
@@ -983,16 +1011,17 @@ export default function App() {
       .catch((err) => console.error('Failed to fetch logs:', err));
   }, [client, selectedDate]);
 
-  // Fetch data when date changes or client is initialized
+  // Initialize Jira client and fetch initial state
   useEffect(() => {
     if (!settings.email || !settings.jiraToken) return;
     JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then(async (client) => {
       setClient(client);
-      await init({ client, setState });
+      await init(setState, client);
       window.client = client;
     });
   }, [settings?.email, settings?.jiraToken]);
 
+  // Fetch worklog data when date changes or client is initialized
   useEffect(() => {
     fetchWorklogs();
   }, [fetchWorklogs]);
@@ -1117,27 +1146,43 @@ export default function App() {
     setAddLogModalOpen(true); // Open add log modal
   }, []);
 
-  const handleStartTracking = useCallback((ticket: JiraTicket) => {
-    setState((currentState) => {
-      const newTrackedTickets = {
-        ...currentState.trackedTickets,
-        [ticket.key]: {
-          startTime: moment().toISOString(),
-          summary: ticket.summary,
-        },
-      };
-      return { ...currentState, trackedTickets: newTrackedTickets };
-    });
-  }, []);
+  const handleStartTracking = useCallback(
+    async (ticket: JiraTicket) => {
+      if (!client) return;
 
-  const handleDiscardTracking = useCallback((ticketKey: string) => {
-    setState((currentState) => {
-      const newTrackedTickets = { ...currentState.trackedTickets };
-      delete newTrackedTickets[ticketKey];
-      return { ...currentState, trackedTickets: newTrackedTickets };
-    });
-    setEditTrackingModalOpen(false);
-  }, []);
+      const updater: StateUpdater = (currentState) => {
+        const newTrackedTickets = {
+          ...currentState.trackedTickets,
+          [ticket.key]: {
+            startTime: moment().toISOString(),
+            summary: ticket.summary,
+          },
+        };
+        return { ...currentState, trackedTickets: newTrackedTickets };
+      };
+
+      const newState = await updateJiraStateAtomically(client, updater);
+      setState(newState);
+    },
+    [client],
+  );
+
+  const handleDiscardTracking = useCallback(
+    async (ticketKey: string) => {
+      if (!client) return;
+
+      const updater: StateUpdater = (currentState) => {
+        const newTrackedTickets = { ...currentState.trackedTickets };
+        delete newTrackedTickets[ticketKey];
+        return { ...currentState, trackedTickets: newTrackedTickets };
+      };
+
+      const newState = await updateJiraStateAtomically(client, updater);
+      setState(newState);
+      setEditTrackingModalOpen(false);
+    },
+    [client],
+  );
 
   const handleStopTracking = useCallback(
     (ticketKey: string) => {
@@ -1169,14 +1214,22 @@ export default function App() {
     [client, fetchWorklogs],
   );
 
-  const toggleStar = useCallback((key: string) => {
-    setState((currentState) => {
-      const starredTickets = currentState.starredTickets.includes(key)
-        ? currentState.starredTickets.filter((k) => k !== key)
-        : [...currentState.starredTickets, key];
-      return { ...currentState, starredTickets };
-    });
-  }, []);
+  const toggleStar = useCallback(
+    async (key: string) => {
+      if (!client) return;
+
+      const updater: StateUpdater = (currentState) => {
+        const starredTickets = currentState.starredTickets.includes(key)
+          ? currentState.starredTickets.filter((k) => k !== key)
+          : [...currentState.starredTickets, key];
+        return { ...currentState, starredTickets };
+      };
+
+      const newState = await updateJiraStateAtomically(client, updater);
+      setState(newState);
+    },
+    [client],
+  );
 
   const formatDateForInput = (date: Date | null) => {
     if (!date) return '';
