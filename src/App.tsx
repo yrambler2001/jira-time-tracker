@@ -1055,8 +1055,10 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                   log.issue.key
                 )}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.issue.fields.summary}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">
+              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
+                {log.issue.fields.summary}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
                 {log.isTracking ? log.workDescription || <i className="text-gray-400">In progress...</i> : (log as ProcessedTimelog).workDescription}
               </td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>
@@ -1392,7 +1394,7 @@ export default function App() {
     const maxDateMinDateDuration = maxDate.getTime() - minDate.getTime();
     const tickCount = 5;
     const xAxisTicks = Array.from({ length: tickCount + 1 }, (_, i) => new Date(minDate.getTime() + (maxDateMinDateDuration / tickCount) * i));
-    const colors = ['#008FFB', '#00E396', '#FEB019', '#FF4560', '#775DD0', '#546E7A', '#26a69a', '#D10CE8'];
+    const colors = ['#008FFB']; // , '#00E396', '#FEB019', '#FF4560', '#775DD0', '#546E7A', '#26a69a', '#D10CE8'];
     const issueKeys = [...new Set(logsWithDates.map((log) => log.issue.key))];
     const ticketColors = issueKeys.reduce(
       (acc, key, index) => {
