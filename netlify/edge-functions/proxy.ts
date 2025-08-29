@@ -1,10 +1,20 @@
 import type { Context } from "@netlify/edge-functions";
 
-export default async (request: Request, context: Context) => {
-  const url = new URL(request.url);
+const matchURL = (url: string) => {
+  // const url = "https://jira.abc.me/proxy/ab-cd_ef/rest/api/3/myself";
+  const regex = /\/proxy\/([^/]+)(\/rest\/.*)/;
+  const match = url.match(regex);
 
-  // Extract the target URL from the path
-  const targetUrl = request.url.replace(url.origin, "").replace("/proxy/", "");
+  if (match) {
+    const first = match[1]; // "ab-cd_ef"
+    const origin = `https://${first}.atlassian.net`;
+    const path = match[2]; // "/rest/api/3/myself"
+    return new URL(origin + path);
+  }
+};
+
+export default async (request: Request, context: Context) => {
+  const targetUrl = matchURL(request.url);
 
   // Create a new request to the target URL
   const proxyRequest = new Request(targetUrl, {
