@@ -49,6 +49,7 @@ interface TrackedTicket {
     fields: {
       summary: string;
     };
+    self?: string; // Optional self link for consistency
   };
   startDate: Date;
   startDateMoment: moment.Moment;
@@ -65,11 +66,11 @@ function formatDuration(start: moment.Moment, end: moment.Moment): string {
   const minutes = duration.minutes();
   const seconds = duration.seconds();
   const parts = [];
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  if (seconds > 0) parts.push(`${seconds}s`);
-  if (parts.length === 0) return '0s';
-  return parts.join(' ');
+  if (hours > 0) parts.push(`${`${hours}`.padStart(2, '0')}:`);
+  /* if (minutes > 0) */ parts.push(`${`${minutes}`.padStart(2, '0')}:`);
+  /* if (seconds > 0) */ parts.push(`${`${seconds}`.padStart(2, '0')}`);
+  if (parts.length === 0) return '00:00';
+  return parts.join('');
 }
 
 function parseDurationToSeconds(durationStr: string): number {
@@ -636,8 +637,27 @@ interface SearchModalProps {
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, onStartTracking, client, starredTickets, toggleStar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JiraTicket[]>([]);
+  const [starredIssues, setStarredIssues] = useState<JiraTicket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchByKey, setSearchByKey] = useState(true);
+  const [isLoadingStarred, setIsLoadingStarred] = useState(false);
+  const [searchType, setSearchType] = useState<'key' | 'text' | 'label' | 'jql'>('key');
+
+  useEffect(() => {
+    if (isOpen && client && starredTickets.length > 0) {
+      setIsLoadingStarred(true);
+      const jql = `key in (${starredTickets.map((k) => `"${k}"`).join(',')})`;
+      client
+        .searchIssuesByJql(jql)
+        .then((response) => {
+          const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary }));
+          setStarredIssues(tickets);
+        })
+        .catch((err) => console.error('Failed to fetch starred tickets', err))
+        .finally(() => setIsLoadingStarred(false));
+    } else if (isOpen) {
+      setStarredIssues([]);
+    }
+  }, [isOpen, client, starredTickets]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -649,7 +669,21 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     const handler = setTimeout(() => {
       if (searchTerm.length > 2 && client) {
         setIsLoading(true);
-        const jql = searchByKey ? `key = "${searchTerm.toUpperCase()}"` : `text ~ "${searchTerm}" order by project asc, key desc`;
+        let jql = '';
+        switch (searchType) {
+          case 'key':
+            jql = `key = "${searchTerm.toUpperCase()}"`;
+            break;
+          case 'text':
+            jql = `text ~ "${searchTerm}" order by project asc, key desc`;
+            break;
+          case 'label':
+            jql = `summary ~ "${searchTerm}" order by project asc, key desc`;
+            break;
+          case 'jql':
+            jql = `${searchTerm}${searchTerm.includes('order by') ? '' : ' order by project asc, key desc'}`;
+            break;
+        }
 
         client
           .searchIssuesByJql(jql)
@@ -667,12 +701,37 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, client, isOpen, searchByKey]);
+  }, [searchTerm, client, isOpen, searchType]);
 
   const handleStartTracking = (ticket: JiraTicket) => {
     onStartTracking(ticket);
     onClose();
   };
+
+  const renderTicketRow = (ticket: JiraTicket) => (
+    <div key={ticket.key} className="p-2 border-b dark:border-gray-700 flex justify-between items-center">
+      <div>
+        <div className="font-semibold text-blue-600 dark:text-blue-400">{ticket.key}</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">{ticket.summary}</div>
+      </div>
+      <div className="flex gap-2 items-center">
+        <button
+          onClick={() => toggleStar(ticket.key)}
+          className={`p-1 rounded-full transition-colors ${
+            starredTickets.includes(ticket.key) ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-400 hover:text-yellow-400'
+          }`}
+        >
+          <StarIcon filled={starredTickets.includes(ticket.key)} />
+        </button>
+        <button onClick={() => handleStartTracking(ticket)} className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded">
+          Start Tracking
+        </button>
+        <button onClick={() => onAddLog(ticket)} className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded">
+          Add Log
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Search Jira Ticket">
@@ -680,44 +739,81 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
         <div className="flex items-center gap-4">
           <input
             type="text"
-            placeholder={searchByKey ? 'Search by ticket key...' : 'Search by text...'}
+            placeholder="Search for a ticket..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
             autoFocus
           />
-          <div className="flex items-center">
-            <span className="text-sm mr-2">Key</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={!searchByKey} onChange={() => setSearchByKey(!searchByKey)} className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
-            </label>
-            <span className="text-sm ml-2">Text</span>
-          </div>
         </div>
+        <div className="flex flex-col items-start gap-2 py-2 text-sm text-gray-700 dark:text-gray-300">
+          <span className="font-medium">Search by:</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="searchTypeVertical"
+              value="key"
+              checked={searchType === 'key'}
+              onChange={() => setSearchType('key')}
+              className="dark:accent-blue-500"
+            />
+            Full Key
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="searchTypeVertical"
+              value="text"
+              checked={searchType === 'text'}
+              onChange={() => setSearchType('text')}
+              className="dark:accent-blue-500"
+            />
+            Text
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="searchTypeVertical"
+              value="label"
+              checked={searchType === 'label'}
+              onChange={() => setSearchType('label')}
+              className="dark:accent-blue-500"
+            />
+            Label
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="searchTypeVertical"
+              value="jql"
+              checked={searchType === 'jql'}
+              onChange={() => setSearchType('jql')}
+              className="dark:accent-blue-500"
+            />
+            JQL
+          </label>
+        </div>
+
         <div className="max-h-60 overflow-y-auto">
           {isLoading && <div className="p-2 text-center text-gray-500">Searching...</div>}
-          {!isLoading &&
-            searchResults.map((ticket) => (
-              <div key={ticket.key} className="p-2 border-b dark:border-gray-700 flex justify-between items-center">
-                <div>
-                  <div className="font-semibold text-blue-600 dark:text-blue-400">{ticket.key}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{ticket.summary}</div>
-                </div>
-                <div className="flex gap-2 items-center">
-                  <button onClick={() => toggleStar(ticket.key)}>
-                    <StarIcon filled={starredTickets.includes(ticket.key)} />
-                  </button>
-                  <button onClick={() => handleStartTracking(ticket)} className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded">
-                    Start Tracking
-                  </button>
-                  <button onClick={() => onAddLog(ticket)} className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded">
-                    Add Log
-                  </button>
-                </div>
-              </div>
-            ))}
+          {isLoadingStarred && searchTerm.length === 0 && <div className="p-2 text-center text-gray-500">Loading starred tickets...</div>}
+
+          {/* Show starred tickets if no search term */}
+          {!isLoadingStarred && searchTerm.length === 0 && starredIssues.length > 0 && (
+            <>
+              <div className="p-2 text-xs font-semibold text-gray-500 uppercase">Starred Tickets</div>
+              {starredIssues.map(renderTicketRow)}
+            </>
+          )}
+
+          {/* Show search results */}
+          {!isLoading && searchTerm.length > 2 && searchResults.map(renderTicketRow)}
+
+          {/* Show messages */}
           {!isLoading && searchTerm.length > 2 && searchResults.length === 0 && <div className="p-2 text-center text-gray-500">No results found.</div>}
+          {!isLoadingStarred && searchTerm.length === 0 && starredTickets.length === 0 && (
+            <div className="p-2 text-center text-gray-500">No starred tickets. Use the search to find and star tickets.</div>
+          )}
         </div>
       </div>
     </Modal>
@@ -835,7 +931,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 break-all">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 break-words">
           {logs.map((log) => (
             <tr
               key={log.id}
@@ -860,7 +956,21 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                   <StarIcon filled={starredTickets.includes(log.issue.key)} />
                 </button>
               </td>
-              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">{log.issue.key}</td>
+              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">
+                {log.issue.self ? (
+                  <a
+                    href={`${new URL(log.issue.self).origin}/browse/${log.issue.key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {log.issue.key}
+                  </a>
+                ) : (
+                  log.issue.key
+                )}
+              </td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.issue.fields.summary}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">
                 {log.isTracking ? log.workDescription || <i className="text-gray-400">In progress...</i> : (log as ProcessedTimelog).workDescription}
@@ -1118,12 +1228,14 @@ export default function App() {
         endDateString: `${end.format('YYYY-MM-DD HH:mm:ss')} (${formatDuration(end, currentTime)} ago)`,
         startDateDisplay: (
           <>
-            {start.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(start, currentTime)} ago)</span>
+            {start.format('YYYY-MM-DD HH:mm:ss')} <br />{' '}
+            <span className="text-xs text-gray-400 font-mono whitespace-pre">({formatDuration(start, currentTime)} ago)</span>
           </>
         ),
         endDateDisplay: (
           <>
-            {end.format('YYYY-MM-DD HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({formatDuration(end, currentTime)} ago)</span>
+            {end.format('YYYY-MM-DD HH:mm:ss')} <br />{' '}
+            <span className="text-xs text-gray-400 font-mono whitespace-pre">({formatDuration(end, currentTime)} ago)</span>
           </>
         ),
         durationString: formatDuration(start, end),
@@ -1146,7 +1258,8 @@ export default function App() {
         startDateMoment: start,
         startDateDisplay: (
           <>
-            {start.format('HH:mm:ss')} <br /> <span className="text-xs text-gray-400">({start.from(currentTime)})</span>
+            {start.format('YYYY-MM-DD HH:mm:ss')} <br />{' '}
+            <span className="text-xs text-gray-400 font-mono whitespace-pre">({formatDuration(start, currentTime)} ago)</span>
           </>
         ),
         durationString: formatDuration(start, currentTime),
