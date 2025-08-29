@@ -34,6 +34,7 @@ interface ProcessedTimelog extends JiraTimelog {
 interface Settings {
   jiraToken: string;
   email: string;
+  jiraEndpoint: string;
   displayOnNewLine: boolean;
 }
 
@@ -321,6 +322,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Settings">
       <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Jira Endpoint</label>
+          <input
+            type="text"
+            value={localSettings.jiraEndpoint}
+            onChange={(e) => setLocalSettings({ ...localSettings, jiraEndpoint: e.target.value })}
+            className="mt-1 block w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+            placeholder="https://your-domain.atlassian.net"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Your Email</label>
           <input
@@ -1267,7 +1278,7 @@ export default function App() {
   } | null>(null);
 
   // State for settings
-  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
+  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', jiraEndpoint: '', displayOnNewLine: false });
 
   // Local state for tracked/starred tickets, synced with Jira user property
   const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [], isDefault: true });
@@ -1301,25 +1312,27 @@ export default function App() {
 
   // Initialize Jira client and fetch initial state
   useEffect(() => {
-    if (!settings.email || !settings.jiraToken) return;
-    JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: '/test1' }).then(async (client) => {
-      setClient(client);
-      await init(setState, client);
-      window.client = client;
-      window.clearState = async () => {
-        if (window.confirm('Are you sure you want to clear the stored state? This will remove all tracked and starred tickets from this app.')) {
-          try {
-            const defaultState = { trackedTickets: {}, starredTickets: [] };
-            await client.setUserProperty(JIRA_PROPERTY_KEY, JSON.stringify(defaultState));
-            window.location.reload();
-          } catch (error) {
-            console.error('Failed to clear state:', error);
-            alert('Failed to clear state. See console for details.');
+    if (!settings.email || !settings.jiraToken || !settings.jiraEndpoint) return;
+    JiraApiClient.initialize({ email: settings.email, apiToken: settings.jiraToken, jiraBaseUrl: settings.jiraEndpoint.replace(/\/$/g, '') }).then(
+      async (client) => {
+        setClient(client);
+        await init(setState, client);
+        window.client = client;
+        window.clearState = async () => {
+          if (window.confirm('Are you sure you want to clear the stored state? This will remove all tracked and starred tickets from this app.')) {
+            try {
+              const defaultState = { trackedTickets: {}, starredTickets: [] };
+              await client.setUserProperty(JIRA_PROPERTY_KEY, JSON.stringify(defaultState));
+              window.location.reload();
+            } catch (error) {
+              console.error('Failed to clear state:', error);
+              alert('Failed to clear state. See console for details.');
+            }
           }
-        }
-      };
-    });
-  }, [settings?.email, settings?.jiraToken]);
+        };
+      },
+    );
+  }, [settings?.email, settings?.jiraToken, settings?.jiraEndpoint]);
 
   // Fetch worklog data when date changes or client is initialized
   useEffect(() => {

@@ -128,7 +128,7 @@ export class JiraApiClient {
   // The constructor is private to prevent direct instantiation.
   private constructor(config: JiraAuthConfig, myself: JiraUser, authHeader: string) {
     this.email = config.email;
-    this.baseUrl = config.jiraBaseUrl;
+    this.baseUrl = `/proxy/${config.jiraBaseUrl}`;
     this.myself = myself;
     this.authHeader = authHeader;
   }
@@ -150,10 +150,11 @@ export class JiraApiClient {
     }
 
     const authHeader = `Basic ${btoa(`${config.email}:${config.apiToken}`)}`;
+    const baseUrl = `/proxy/${config.jiraBaseUrl}`;
 
     const myself = await this._getMyself({
       authHeader,
-      baseUrl: config.jiraBaseUrl,
+      baseUrl,
     });
 
     // Create and store the singleton instance
@@ -490,7 +491,7 @@ export class JiraApiClient {
     const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog`;
     const body: any = {
       timeSpentSeconds: worklog.timeSpentSeconds,
-      started: moment(worklog.started).toISOString().replace('Z','+0000'),
+      started: moment(worklog.started).toISOString().replace('Z', '+0000'),
     };
 
     if (worklog.comment) {
@@ -547,7 +548,7 @@ export class JiraApiClient {
     const url = `${this.baseUrl}/rest/api/3/issue/${issueIdOrKey}/worklog/${worklogId}`;
     const body: any = {
       timeSpentSeconds: worklog.timeSpentSeconds,
-      started: moment(worklog.started).toISOString().replace('Z','+0000'),
+      started: moment(worklog.started).toISOString().replace('Z', '+0000'),
     };
 
     if (worklog.comment) {

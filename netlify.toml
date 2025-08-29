@@ -1,16 +1,10 @@
 [build]
   publish = "dist/"
-  command = "sed -i s%TEST1%${TEST1}%g netlify.toml && npm run build"
+  command = "npm run build"
 
 [[edge_functions]]
-  path = "/test1/*"
-  function = "set-custom-user-agent"
-
-[[redirects]]
-  from = "/test1/*"
-  to = "TEST1/:splat"
-  status = 200
-  force = true
+  path = "/proxy/*"
+  function = "proxy"
 
 [[redirects]]
   from = "/*"

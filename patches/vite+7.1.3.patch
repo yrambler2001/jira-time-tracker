@@ -1,0 +1,13 @@
+diff --git a/node_modules/vite/dist/node/chunks/dep-Bj7gA1-0.js b/node_modules/vite/dist/node/chunks/dep-Bj7gA1-0.js
+index 2698c9f..5c3eeb5 100644
+--- a/node_modules/vite/dist/node/chunks/dep-Bj7gA1-0.js
++++ b/node_modules/vite/dist/node/chunks/dep-Bj7gA1-0.js
+@@ -25379,7 +25379,7 @@ var require_http_proxy = /* @__PURE__ */ __commonJS({ "../../node_modules/.pnpm/
+ 							counter--;
+ 						} else requestOptions = { ...options$2 };
+ 						if (args[counter] instanceof Buffer) head = args[counter];
+-						for (const e$1 of ["target", "forward"]) if (typeof requestOptions[e$1] === "string") requestOptions[e$1] = (0, common_1.toURL)(requestOptions[e$1]);
++						for (const e$1 of ["target", "forward"]) if (typeof requestOptions[e$1] === "function") requestOptions[e$1] = (0, common_1.toURL)(requestOptions[e$1](args));
+ 						if (!requestOptions.target && !requestOptions.forward) {
+ 							this.emit("error", /* @__PURE__ */ new Error("Must set target or forward"), req$4, res);
+ 							return;
