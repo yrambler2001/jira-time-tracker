@@ -2,17 +2,16 @@ import type { Context } from "@netlify/edge-functions";
 
 export default async (request: Request, context: Context) => {
   const url = new URL(request.url);
-  const path = url.pathname;
 
   // Extract the target URL from the path
-  const targetUrl = path.replace('/proxy/', 'https://');
+  const targetUrl = request.url.replace(url.origin, "").replace("/proxy/", "");
 
   // Create a new request to the target URL
   const proxyRequest = new Request(targetUrl, {
     method: request.method,
     headers: request.headers,
     body: request.body,
-    redirect: 'follow'
+    redirect: "follow",
   });
 
   // Set the custom User-Agent header
@@ -25,6 +24,6 @@ export default async (request: Request, context: Context) => {
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers
+    headers: response.headers,
   });
 };
