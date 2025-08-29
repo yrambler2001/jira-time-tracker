@@ -101,6 +101,15 @@ function formatSecondsToDuration(totalSeconds: number): string {
   return parts.join(' ');
 }
 
+// New helper function to format the total daily tracked time
+function formatTotalSeconds(totalSeconds: number): string {
+  if (isNaN(totalSeconds) || totalSeconds < 0) return '0h 0m';
+  const duration = moment.duration(totalSeconds, 'seconds');
+  const hours = Math.floor(duration.asHours());
+  const minutes = duration.minutes();
+  return `${hours}h ${minutes}m`;
+}
+
 const extractTextFromAtlassianDocumentFormat = (node: any): string => {
   if (!node) return '';
 
@@ -1430,6 +1439,28 @@ export default function App() {
 
   const { allLogs, groupedLogs, uniqueTickets, ticketColors, minDate, maxDateMinDateDuration, xAxisTicks, displayMode } = timelineData;
 
+  // Calculate total tracked time for the selected day
+  const totalTrackedTodayInSeconds = useMemo(() => {
+    const startOfDay = moment(selectedDate).startOf('day');
+    const endOfDay = moment(selectedDate).endOf('day');
+    let totalSeconds = 0;
+
+    allLogs.forEach((log) => {
+      const logStart = log.startDateMoment;
+      const logEnd = log.isTracking ? currentTime : (log as ProcessedTimelog).endDateMoment;
+
+      // Determine the portion of the log that falls within the selected day
+      const effectiveStart = moment.max(logStart, startOfDay);
+      const effectiveEnd = moment.min(logEnd, endOfDay);
+
+      if (effectiveEnd.isAfter(effectiveStart)) {
+        totalSeconds += effectiveEnd.diff(effectiveStart, 'seconds');
+      }
+    });
+
+    return totalSeconds;
+  }, [allLogs, selectedDate, currentTime]);
+
   const handleRowClick = useCallback((log: ProcessedTimelog) => {
     setEditingLog(log);
     setEditModalOpen(true);
@@ -1647,7 +1678,11 @@ export default function App() {
                 <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Jira Timelogs Dashboard</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">For developers by developers.</p>
               </div>
-              <div className="flex items-center gap-2 mt-4 sm:mt-0">
+              <div className="flex items-end gap-4 mt-4 sm:mt-0">
+                <div className="text-right">
+                  <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Total for Day</label>
+                  <div className="p-2 font-bold text-lg text-gray-800 dark:text-white">{formatTotalSeconds(totalTrackedTodayInSeconds)}</div>
+                </div>
                 <div>
                   <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Select Date</label>
                   <input
@@ -1659,13 +1694,13 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setSearchModalOpen(true)}
-                  className="p-2.5 mt-5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  className="p-2.5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
                 >
                   <SearchIcon />
                 </button>
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="p-2.5 mt-5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  className="p-2.5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
                 >
                   <SettingsIcon />
                 </button>
