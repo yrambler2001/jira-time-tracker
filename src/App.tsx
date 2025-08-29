@@ -54,6 +54,7 @@ interface TrackedTicket {
   startDateMoment: moment.Moment;
   startDateDisplay: React.ReactNode;
   durationString: string;
+  workDescription: string;
   isTracking: true;
 }
 
@@ -530,7 +531,7 @@ const AddTimelogModal: React.FC<AddTimelogModalProps> = ({ isOpen, onClose, tick
 interface EditTrackingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  trackingInfo: { id: string; key: string; summary: string; startTime: string } | null;
+  trackingInfo: { id: string; key: string; summary: string; startTime: string; workDescription: string } | null;
   client: JiraApiClient | null;
   onUpdate: () => void;
   onDiscard: (id: string) => void;
@@ -546,7 +547,7 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
     startDateMoment: startMoment,
     endDateMoment: endMoment,
     durationString: formatDuration(startMoment, endMoment),
-    description: '',
+    description: trackingInfo.workDescription || '',
   };
 
   const handleSave = async (data: any) => {
@@ -562,6 +563,62 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Submit Time for ${trackingInfo.key}`}>
       <TimelogForm initialData={initialData} onSave={handleSave} onDelete={() => onDiscard(trackingInfo.id)} buttonText="Submit Timelog" />
+    </Modal>
+  );
+};
+
+// --- NEW MODAL FOR EDITING ACTIVE TRACKING ---
+interface EditActiveTrackingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  log: TrackedTicket | null;
+  onSave: (id: string, updates: { startTime: string; workDescription: string }) => void;
+}
+
+const EditActiveTrackingModal: React.FC<EditActiveTrackingModalProps> = ({ isOpen, onClose, log, onSave }) => {
+  const [startTime, setStartTime] = useState('');
+  const [workDescription, setWorkDescription] = useState('');
+
+  useEffect(() => {
+    if (log) {
+      setStartTime(log.startDateMoment.format('YYYY-MM-DD HH:mm:ss'));
+      setWorkDescription(log.workDescription || '');
+    }
+  }, [log, isOpen]);
+
+  if (!log) return null;
+
+  const handleSave = () => {
+    onSave(log.id, { startTime, workDescription });
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Edit Tracking for ${log.issue.key}`}>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Time (YYYY-MM-DD HH:mm:ss)</label>
+          <input
+            type="text"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="mt-1 block w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Work Description</label>
+          <textarea
+            value={workDescription}
+            onChange={(e) => setWorkDescription(e.target.value)}
+            rows={4}
+            className="mt-1 block w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+          />
+        </div>
+        <div className="flex justify-end pt-4">
+          <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            Save Changes
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 };
@@ -723,6 +780,7 @@ interface TimelineTableProps {
   hoveredLogId: string | null;
   setHoveredLogId: (id: string | null) => void;
   onRowClick: (log: ProcessedTimelog) => void;
+  onEditTracking: (log: TrackedTicket) => void;
   onStopTracking: (trackingId: string) => void;
   onDiscardTracking: (trackingId: string) => void;
   onStartTracking: (ticket: JiraTicket) => void;
@@ -736,6 +794,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
   hoveredLogId,
   setHoveredLogId,
   onRowClick,
+  onEditTracking,
   onStopTracking,
   onDiscardTracking,
   onStartTracking,
@@ -780,10 +839,16 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
           {logs.map((log) => (
             <tr
               key={log.id}
-              className={`transition-colors duration-200 ${!log.isTracking ? 'cursor-pointer' : ''} ${hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+              className={`transition-colors duration-200 cursor-pointer ${hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}`}
               onMouseEnter={() => setHoveredLogId(log.id)}
               onMouseLeave={() => setHoveredLogId(null)}
-              onClick={() => !log.isTracking && onRowClick(log as ProcessedTimelog)}
+              onClick={() => {
+                if (log.isTracking) {
+                  onEditTracking(log as TrackedTicket);
+                } else {
+                  onRowClick(log as ProcessedTimelog);
+                }
+              }}
             >
               <td className="px-6 py-4">
                 <button
@@ -798,7 +863,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
               <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">{log.issue.key}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">{log.issue.fields.summary}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 break-words">
-                {!log.isTracking ? (log as ProcessedTimelog).workDescription : <i className="text-gray-400">In progress...</i>}
+                {log.isTracking ? log.workDescription || <i className="text-gray-400">In progress...</i> : (log as ProcessedTimelog).workDescription}
               </td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>
               <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{!log.isTracking ? (log as ProcessedTimelog).endDateDisplay : ''}</td>
@@ -881,6 +946,7 @@ interface State {
       key: string;
       startTime: string;
       summary: string;
+      workDescription?: string;
     };
   };
   starredTickets: string[];
@@ -974,10 +1040,18 @@ export default function App() {
   const [isSearchModalOpen, setSearchModalOpen] = useState(false);
   const [isAddLogModalOpen, setAddLogModalOpen] = useState(false);
   const [isEditTrackingModalOpen, setEditTrackingModalOpen] = useState(false);
+  const [isEditActiveTrackingModalOpen, setEditActiveTrackingModalOpen] = useState(false);
 
   const [editingLog, setEditingLog] = useState<ProcessedTimelog | null>(null);
+  const [editingActiveLog, setEditingActiveLog] = useState<TrackedTicket | null>(null);
   const [ticketForAddLog, setTicketForAddLog] = useState<JiraTicket | null>(null);
-  const [editingTrackingInfo, setEditingTrackingInfo] = useState<{ id: string; key: string; summary: string; startTime: string } | null>(null);
+  const [editingTrackingInfo, setEditingTrackingInfo] = useState<{
+    id: string;
+    key: string;
+    summary: string;
+    startTime: string;
+    workDescription: string;
+  } | null>(null);
 
   // State for settings
   const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', displayOnNewLine: false });
@@ -1061,7 +1135,7 @@ export default function App() {
     const trackedTickets: TrackedTicket[] = Object.entries(state.trackedTickets).map(([id, value]) => {
       const start = moment(value.startTime);
       return {
-        id: id,
+        id,
         issue: {
           key: value.key,
           fields: {
@@ -1076,6 +1150,7 @@ export default function App() {
           </>
         ),
         durationString: formatDuration(start, currentTime),
+        workDescription: value.workDescription || '',
         isTracking: true,
       };
     });
@@ -1159,6 +1234,7 @@ export default function App() {
             key: ticket.key,
             startTime: moment().toISOString(),
             summary: ticket.summary,
+            workDescription: '',
           },
         };
         return { ...currentState, trackedTickets: newTrackedTickets };
@@ -1197,10 +1273,44 @@ export default function App() {
         key: trackingInfo.key,
         summary: trackingInfo.summary,
         startTime: trackingInfo.startTime,
+        workDescription: trackingInfo.workDescription || '',
       });
       setEditTrackingModalOpen(true);
     },
     [client, state.trackedTickets],
+  );
+
+  const handleOpenEditActiveTracking = useCallback((log: TrackedTicket) => {
+    setEditingActiveLog(log);
+    setEditActiveTrackingModalOpen(true);
+  }, []);
+
+  const handleSaveActiveTracking = useCallback(
+    async (id: string, updates: { startTime: string; workDescription: string }) => {
+      if (!client) return;
+      const updater: StateUpdater = (currentState) => {
+        const ticketToUpdate = currentState.trackedTickets[id];
+        if (!ticketToUpdate) return currentState;
+
+        const updatedTicket = {
+          ...ticketToUpdate,
+          startTime: moment(updates.startTime, 'YYYY-MM-DD HH:mm:ss').toISOString(),
+          workDescription: updates.workDescription,
+        };
+
+        return {
+          ...currentState,
+          trackedTickets: {
+            ...currentState.trackedTickets,
+            [id]: updatedTicket,
+          },
+        };
+      };
+      const newState = await updateJiraStateAtomically(client, updater);
+      setState(newState);
+      setEditActiveTrackingModalOpen(false);
+    },
+    [client],
   );
 
   const handleDeleteLog = useCallback(
@@ -1268,6 +1378,12 @@ export default function App() {
           fetchWorklogs();
         }}
         onDiscard={(id) => handleDiscardTracking(id)}
+      />
+      <EditActiveTrackingModal
+        isOpen={isEditActiveTrackingModalOpen}
+        onClose={() => setEditActiveTrackingModalOpen(false)}
+        log={editingActiveLog}
+        onSave={handleSaveActiveTracking}
       />
 
       <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
@@ -1385,6 +1501,7 @@ export default function App() {
             hoveredLogId={hoveredLogId}
             setHoveredLogId={setHoveredLogId}
             onRowClick={handleRowClick}
+            onEditTracking={handleOpenEditActiveTracking}
             onStopTracking={handleStopTracking}
             onDiscardTracking={handleDiscardTracking}
             onStartTracking={handleStartTracking}
