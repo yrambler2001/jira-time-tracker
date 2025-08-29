@@ -40,6 +40,7 @@ interface Settings {
 interface JiraTicket {
   key: string;
   summary: string;
+  self?: string;
 }
 
 interface TrackedTicket {
@@ -231,7 +232,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, closeOn
     >
       <div className={`absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'}`} />
       <div
-        className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+        className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ${
+          isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
@@ -245,6 +248,44 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, closeOn
         <div className="mt-4">{children}</div>
       </div>
     </div>
+  );
+};
+
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel' }) => {
+  if (!isOpen) return null;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+      <div className="space-y-4">
+        <p className="text-gray-700 dark:text-gray-300">{message}</p>
+        <div className="flex justify-end gap-4 pt-4">
+          <button
+            onClick={onClose}
+            className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-black dark:text-white font-bold py-2 px-4 rounded"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -456,8 +497,9 @@ interface EditTimelogModalProps {
   log: ProcessedTimelog | null;
   client: JiraApiClient | null;
   onUpdate: () => void;
+  onDeleteRequest: (log: ProcessedTimelog) => void;
 }
-const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, log, client, onUpdate }) => {
+const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, log, client, onUpdate, onDeleteRequest }) => {
   if (!log || !client) return null;
 
   const initialData = {
@@ -477,16 +519,9 @@ const EditTimelogModal: React.FC<EditTimelogModalProps> = ({ isOpen, onClose, lo
     onClose();
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this worklog?')) {
-      try {
-        await client.deleteWorklog(log.issue.key, log.id);
-        onUpdate();
-      } catch (error) {
-        console.error('Failed to delete worklog:', error);
-      }
-      onClose();
-    }
+  const handleDelete = () => {
+    onDeleteRequest(log);
+    onClose();
   };
 
   return (
@@ -563,7 +598,15 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Submit Time for ${trackingInfo.key}`}>
-      <TimelogForm initialData={initialData} onSave={handleSave} onDelete={() => onDiscard(trackingInfo.id)} buttonText="Submit Timelog" />
+      <TimelogForm
+        initialData={initialData}
+        onSave={handleSave}
+        onDelete={() => {
+          onDiscard(trackingInfo.id);
+          onClose();
+        }}
+        buttonText="Submit Timelog"
+      />
     </Modal>
   );
 };
@@ -591,6 +634,7 @@ const EditActiveTrackingModal: React.FC<EditActiveTrackingModalProps> = ({ isOpe
 
   const handleSave = () => {
     onSave(log.id, { startTime, workDescription });
+    onClose();
   };
 
   return (
@@ -640,7 +684,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
   const [starredIssues, setStarredIssues] = useState<JiraTicket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStarred, setIsLoadingStarred] = useState(false);
-  const [searchType, setSearchType] = useState<'key' | 'text' | 'label' | 'jql'>('key');
+  const [searchType, setSearchType] = useState<'key' | 'text' | 'summary' | 'jql' | 'myTickets'>('key');
+  const [orderBy, setOrderBy] = useState('key');
 
   useEffect(() => {
     if (isOpen && client && starredTickets.length > 0) {
@@ -649,7 +694,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
       client
         .searchIssuesByJql(jql)
         .then((response) => {
-          const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary }));
+          const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary, self: issue.self }));
           setStarredIssues(tickets);
         })
         .catch((err) => console.error('Failed to fetch starred tickets', err))
@@ -659,6 +704,74 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     }
   }, [isOpen, client, starredTickets]);
 
+  const performSearch = useCallback(
+    (currentSearchTerm: string, currentSearchType: string, currentOrderBy: string) => {
+      if (!client) return;
+
+      let isSearchable = false;
+      if (currentSearchType === 'myTickets') {
+        isSearchable = true;
+      } else if (currentSearchType === 'jql') {
+        isSearchable = currentSearchTerm.length > 0;
+      } else {
+        isSearchable = currentSearchTerm.length > 2;
+      }
+
+      if (isSearchable) {
+        setIsLoading(true);
+        let baseJql = '';
+        switch (currentSearchType) {
+          case 'key':
+            baseJql = `key = "${currentSearchTerm.toUpperCase()}"`;
+            break;
+          case 'text':
+            baseJql = `text ~ "${currentSearchTerm}"`;
+            break;
+          case 'summary':
+            baseJql = `summary ~ "${currentSearchTerm}"`;
+            break;
+          case 'jql':
+            baseJql = currentSearchTerm;
+            break;
+          case 'myTickets':
+            baseJql = 'assignee = currentUser() and sprint in openSprints()';
+            break;
+        }
+
+        let orderByClause = '';
+        switch (currentOrderBy) {
+          case 'key':
+            orderByClause = ' order by project asc, key desc';
+            break;
+          case 'timespent':
+            orderByClause = ' order by timespent desc';
+            baseJql += ' and timespent is not empty';
+            break;
+          case 'updated':
+            orderByClause = ' order by updated desc';
+            break;
+          case 'priority':
+            orderByClause = ' order by priority desc';
+            break;
+        }
+
+        const jql = baseJql.toLowerCase().includes('order by') ? baseJql : baseJql + orderByClause;
+
+        client
+          .searchIssuesByJql(jql)
+          .then((response) => {
+            const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary, self: issue.self }));
+            setSearchResults(tickets);
+          })
+          .catch((err) => console.error('Search failed:', err))
+          .finally(() => setIsLoading(false));
+      } else {
+        setSearchResults([]);
+      }
+    },
+    [client],
+  );
+
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
@@ -667,41 +780,13 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     }
 
     const handler = setTimeout(() => {
-      if (searchTerm.length > 2 && client) {
-        setIsLoading(true);
-        let jql = '';
-        switch (searchType) {
-          case 'key':
-            jql = `key = "${searchTerm.toUpperCase()}"`;
-            break;
-          case 'text':
-            jql = `text ~ "${searchTerm}" order by project asc, key desc`;
-            break;
-          case 'label':
-            jql = `summary ~ "${searchTerm}" order by project asc, key desc`;
-            break;
-          case 'jql':
-            jql = `${searchTerm}${searchTerm.includes('order by') ? '' : ' order by project asc, key desc'}`;
-            break;
-        }
-
-        client
-          .searchIssuesByJql(jql)
-          .then((response) => {
-            const tickets = response.issues.map((issue) => ({ key: issue.key, summary: issue.fields.summary }));
-            setSearchResults(tickets);
-          })
-          .catch((err) => console.error('Search failed:', err))
-          .finally(() => setIsLoading(false));
-      } else {
-        setSearchResults([]);
-      }
+      performSearch(searchTerm, searchType, orderBy);
     }, 500); // Debounce search
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, client, isOpen, searchType]);
+  }, [searchTerm, searchType, orderBy, isOpen, performSearch]);
 
   const handleStartTracking = (ticket: JiraTicket) => {
     onStartTracking(ticket);
@@ -733,6 +818,17 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     </div>
   );
 
+  const renderRadioGroup = (options: { value: string; label: string }[], selectedValue: string, onChange: (value: any) => void, name: string) => (
+    <div className="flex flex-wrap items-start gap-x-4 gap-y-2 py-2 text-sm text-gray-700 dark:text-gray-300">
+      {options.map(({ value, label }) => (
+        <label key={value} className="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name={name} value={value} checked={selectedValue === value} onChange={() => onChange(value)} className="dark:accent-blue-500" />
+          {label}
+        </label>
+      ))}
+    </div>
+  );
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Search Jira Ticket">
       <div className="space-y-4">
@@ -744,74 +840,60 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full p-2 border rounded-md bg-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
             autoFocus
+            disabled={searchType === 'myTickets'}
           />
         </div>
-        <div className="flex flex-col items-start gap-2 py-2 text-sm text-gray-700 dark:text-gray-300">
-          <span className="font-medium">Search by:</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="searchTypeVertical"
-              value="key"
-              checked={searchType === 'key'}
-              onChange={() => setSearchType('key')}
-              className="dark:accent-blue-500"
-            />
-            Full Key
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="searchTypeVertical"
-              value="text"
-              checked={searchType === 'text'}
-              onChange={() => setSearchType('text')}
-              className="dark:accent-blue-500"
-            />
-            Text
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="searchTypeVertical"
-              value="label"
-              checked={searchType === 'label'}
-              onChange={() => setSearchType('label')}
-              className="dark:accent-blue-500"
-            />
-            Label
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="searchTypeVertical"
-              value="jql"
-              checked={searchType === 'jql'}
-              onChange={() => setSearchType('jql')}
-              className="dark:accent-blue-500"
-            />
-            JQL
-          </label>
+        <div className="space-y-2">
+          <div>
+            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Search by:</span>
+            {renderRadioGroup(
+              [
+                { value: 'key', label: 'Full Key' },
+                { value: 'summary', label: 'Label' },
+                { value: 'text', label: 'Text' },
+                { value: 'myTickets', label: 'My Tickets on Board' },
+                { value: 'jql', label: 'JQL' },
+              ],
+              searchType,
+              setSearchType,
+              'searchType',
+            )}
+          </div>
+          <div>
+            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Order by:</span>
+            {renderRadioGroup(
+              [
+                { value: 'key', label: 'Key' },
+                { value: 'timespent', label: 'Time Spent' },
+                { value: 'updated', label: 'Updated' },
+                { value: 'priority', label: 'Priority' },
+              ],
+              orderBy,
+              setOrderBy,
+              'orderBy',
+            )}
+          </div>
         </div>
 
-        <div className="max-h-60 overflow-y-auto">
+        <div className="max-h-150 overflow-y-auto">
           {isLoading && <div className="p-2 text-center text-gray-500">Searching...</div>}
-          {isLoadingStarred && searchTerm.length === 0 && <div className="p-2 text-center text-gray-500">Loading starred tickets...</div>}
+          {isLoadingStarred && searchTerm.length === 0 && searchType !== 'myTickets' && (
+            <div className="p-2 text-center text-gray-500">Loading starred tickets...</div>
+          )}
 
-          {/* Show starred tickets if no search term */}
-          {!isLoadingStarred && searchTerm.length === 0 && starredIssues.length > 0 && (
+          {!isLoadingStarred && searchTerm.length === 0 && searchType !== 'myTickets' && starredIssues.length > 0 && (
             <>
               <div className="p-2 text-xs font-semibold text-gray-500 uppercase">Starred Tickets</div>
               {starredIssues.map(renderTicketRow)}
             </>
           )}
 
-          {/* Show search results */}
-          {!isLoading && searchTerm.length > 2 && searchResults.map(renderTicketRow)}
+          {!isLoading && searchResults.map(renderTicketRow)}
 
-          {/* Show messages */}
-          {!isLoading && searchTerm.length > 2 && searchResults.length === 0 && <div className="p-2 text-center text-gray-500">No results found.</div>}
-          {!isLoadingStarred && searchTerm.length === 0 && starredTickets.length === 0 && (
+          {!isLoading && searchType !== 'myTickets' && searchTerm.length > 2 && searchResults.length === 0 && (
+            <div className="p-2 text-center text-gray-500">No results found.</div>
+          )}
+          {!isLoadingStarred && searchTerm.length === 0 && searchType !== 'myTickets' && starredTickets.length === 0 && (
             <div className="p-2 text-center text-gray-500">No starred tickets. Use the search to find and star tickets.</div>
           )}
         </div>
@@ -935,7 +1017,9 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
           {logs.map((log) => (
             <tr
               key={log.id}
-              className={`transition-colors duration-200 cursor-pointer ${hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}`}
+              className={`transition-colors duration-200 cursor-pointer ${
+                hoveredLogId === log.id ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
               onMouseEnter={() => setHoveredLogId(log.id)}
               onMouseLeave={() => setHoveredLogId(null)}
               onClick={() => {
@@ -1001,11 +1085,11 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2 w-28">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onStartTracking({ key: log.issue.key, summary: log.issue.fields.summary });
+                        onStartTracking({ key: log.issue.key, summary: log.issue.fields.summary, self: log.issue.self });
                       }}
                       className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded"
                     >
@@ -1014,7 +1098,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onAddLog({ key: log.issue.key, summary: log.issue.fields.summary });
+                        onAddLog({ key: log.issue.key, summary: log.issue.fields.summary, self: log.issue.self });
                       }}
                       className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded"
                     >
@@ -1056,6 +1140,7 @@ interface State {
       key: string;
       startTime: string;
       summary: string;
+      self?: string;
       workDescription?: string;
     };
   };
@@ -1151,6 +1236,12 @@ export default function App() {
   const [isAddLogModalOpen, setAddLogModalOpen] = useState(false);
   const [isEditTrackingModalOpen, setEditTrackingModalOpen] = useState(false);
   const [isEditActiveTrackingModalOpen, setEditActiveTrackingModalOpen] = useState(false);
+  const [confirmModalState, setConfirmModalState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const [editingLog, setEditingLog] = useState<ProcessedTimelog | null>(null);
   const [editingActiveLog, setEditingActiveLog] = useState<TrackedTicket | null>(null);
@@ -1203,6 +1294,18 @@ export default function App() {
       setClient(client);
       await init(setState, client);
       window.client = client;
+      window.clearState = async () => {
+        if (window.confirm('Are you sure you want to clear the stored state? This will remove all tracked and starred tickets from this app.')) {
+          try {
+            const defaultState = { trackedTickets: {}, starredTickets: [] };
+            await client.setUserProperty(JIRA_PROPERTY_KEY, JSON.stringify(defaultState));
+            window.location.reload();
+          } catch (error) {
+            console.error('Failed to clear state:', error);
+            alert('Failed to clear state. See console for details.');
+          }
+        }
+      };
     });
   }, [settings?.email, settings?.jiraToken]);
 
@@ -1250,6 +1353,7 @@ export default function App() {
         id,
         issue: {
           key: value.key,
+          self: value.self,
           fields: {
             summary: value.summary,
           },
@@ -1347,6 +1451,7 @@ export default function App() {
             key: ticket.key,
             startTime: moment().toISOString(),
             summary: ticket.summary,
+            self: ticket.self,
             workDescription: '',
           },
         };
@@ -1363,15 +1468,22 @@ export default function App() {
     async (trackingId: string) => {
       if (!client) return;
 
-      const updater: StateUpdater = (currentState) => {
-        const newTrackedTickets = { ...currentState.trackedTickets };
-        delete newTrackedTickets[trackingId];
-        return { ...currentState, trackedTickets: newTrackedTickets };
-      };
+      setConfirmModalState({
+        isOpen: true,
+        title: 'Discard Tracking',
+        message: 'Are you sure you want to discard this tracked time? It will be permanently lost.',
+        onConfirm: async () => {
+          const updater: StateUpdater = (currentState) => {
+            const newTrackedTickets = { ...currentState.trackedTickets };
+            delete newTrackedTickets[trackingId];
+            return { ...currentState, trackedTickets: newTrackedTickets };
+          };
 
-      const newState = await updateJiraStateAtomically(client, updater);
-      setState(newState);
-      setEditTrackingModalOpen(false);
+          const newState = await updateJiraStateAtomically(client, updater);
+          setState(newState);
+          setEditTrackingModalOpen(false);
+        },
+      });
     },
     [client],
   );
@@ -1429,14 +1541,19 @@ export default function App() {
   const handleDeleteLog = useCallback(
     async (log: ProcessedTimelog) => {
       if (!client) return;
-      if (window.confirm(`Are you sure you want to delete this worklog for ${log.issue.key}?`)) {
-        try {
-          await client.deleteWorklog(log.issue.key, log.id);
-          fetchWorklogs();
-        } catch (error) {
-          console.error('Failed to delete worklog:', error);
-        }
-      }
+      setConfirmModalState({
+        isOpen: true,
+        title: 'Delete Worklog',
+        message: `Are you sure you want to delete this worklog for ${log.issue.key}? This action cannot be undone.`,
+        onConfirm: async () => {
+          try {
+            await client.deleteWorklog(log.issue.key, log.id);
+            fetchWorklogs();
+          } catch (error) {
+            console.error('Failed to delete worklog:', error);
+          }
+        },
+      });
     },
     [client, fetchWorklogs],
   );
@@ -1467,8 +1584,23 @@ export default function App() {
     <>
       <style>{` .timeline-grid { background-size: 20% 100%; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px); } .dark .timeline-grid { background-image: linear-gradient(to right, #4b5563 1px, transparent 1px); } .timeline-bar { transition: all 0.2s ease-in-out; overflow: visible; } .timeline-bar:hover { z-index: 10; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); } .timeline-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.2s; } .timeline-bar:hover .timeline-tooltip { visibility: visible; opacity: 1; } `}</style>
 
+      <ConfirmModal
+        isOpen={confirmModalState.isOpen}
+        onClose={() => setConfirmModalState({ ...confirmModalState, isOpen: false })}
+        title={confirmModalState.title}
+        message={confirmModalState.message}
+        onConfirm={confirmModalState.onConfirm}
+      />
+
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={setSettings} />
-      <EditTimelogModal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} log={editingLog} client={client} onUpdate={fetchWorklogs} />
+      <EditTimelogModal
+        isOpen={isEditModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        log={editingLog}
+        client={client}
+        onUpdate={fetchWorklogs}
+        onDeleteRequest={handleDeleteLog}
+      />
       <SearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setSearchModalOpen(false)}
@@ -1486,7 +1618,13 @@ export default function App() {
         client={client}
         onUpdate={() => {
           if (editingTrackingInfo) {
-            handleDiscardTracking(editingTrackingInfo.id);
+            // This logic submits the tracked time, then we need to remove it from tracking state
+            const updater: StateUpdater = (currentState) => {
+              const newTrackedTickets = { ...currentState.trackedTickets };
+              delete newTrackedTickets[editingTrackingInfo.id];
+              return { ...currentState, trackedTickets: newTrackedTickets };
+            };
+            updateJiraStateAtomically(client!, updater).then(setState);
           }
           fetchWorklogs();
         }}
