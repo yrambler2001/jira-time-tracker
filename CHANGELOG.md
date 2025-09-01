@@ -1,3 +1,7 @@
+## <small>2.0.0 (2025-09-01)</small>
+
+- Completely refactored
+
 ## <small>1.1.0 (2025-09-01)</small>
 
 - Added theme selector
