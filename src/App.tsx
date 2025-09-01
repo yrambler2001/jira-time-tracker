@@ -36,6 +36,7 @@ interface Settings {
   email: string;
   jiraSubdomain: string;
   displayOnNewLine: boolean;
+  theme: 'light' | 'dark' | 'system';
 }
 
 interface JiraTicket {
@@ -370,6 +371,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
           </label>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Theme</span>
+          <div className="flex items-center gap-2">
+            {(['light', 'dark', 'system'] as const).map((theme) => (
+              <button
+                key={theme}
+                onClick={() => setLocalSettings({ ...localSettings, theme })}
+                className={`px-3 py-1 text-sm rounded-md ${localSettings.theme === theme ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600'}`}
+              >
+                {theme.charAt(0).toUpperCase() + theme.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex justify-end pt-4">
           <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Save
@@ -438,7 +453,7 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, onDelete
   );
 
   const getInputClass = (field: AutoCalcField) => {
-    const baseClass = 'block w-full p-2 border rounded-md bg-transparent dark:border-gray-600 dark:text-gray-300';
+    const baseClass = 'block w-full p-2 border rounded-md dark:border-gray-600 dark:text-gray-300';
     return autoCalcField === field ? `${baseClass} bg-gray-100 dark:bg-gray-700` : baseClass;
   };
 
@@ -934,8 +949,12 @@ const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ log }) => (
     <br /> <strong>Start:</strong> {log.startDateString}
     <br /> <strong>End:</strong> {log.endDateString}
     <br /> <strong>Duration:</strong> {log.durationString}
-    <br />
-    <strong>Work:</strong> {log.workDescription}
+    {log.workDescription ? (
+      <>
+        <br />
+        <strong>Work Description:</strong> {log.workDescription}
+      </>
+    ) : null}
   </div>
 );
 interface TimelineBarProps {
@@ -1057,6 +1076,9 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                     e.stopPropagation();
                     toggleStar(log.issue.key);
                   }}
+                  className={`p-1 rounded-full transition-colors ${
+                    starredTickets.includes(log.issue.key) ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-400 hover:text-yellow-400'
+                  }`}
                 >
                   <StarIcon filled={starredTickets.includes(log.issue.key)} />
                 </button>
@@ -1278,7 +1300,7 @@ export default function App() {
   } | null>(null);
 
   // State for settings
-  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', jiraSubdomain: '', displayOnNewLine: false });
+  const [settings, setSettings] = useState<Settings>({ email: '', jiraToken: '', jiraSubdomain: '', displayOnNewLine: false, theme: 'system' });
 
   // Local state for tracked/starred tickets, synced with Jira user property
   const [state, setState] = useState<State>({ trackedTickets: {}, starredTickets: [], isDefault: true });
@@ -1290,6 +1312,17 @@ export default function App() {
       setSettings(JSON.parse(savedSettings));
     }
   }, []);
+
+  // Apply theme
+  useEffect(() => {
+    console.log(settings.theme)
+    const root = window.document.documentElement;
+    if (settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [settings.theme]);
 
   // Update current time every second for tracking timers
   useEffect(() => {
@@ -1814,7 +1847,7 @@ export default function App() {
           />
         )}
 
-        <footer className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <footer className="text-center py-8 pb-0 text-gray-500 dark:text-gray-400">
           <small>
             Made with
             <span className="mx-1 text-red-500" role="img" aria-label="love">
