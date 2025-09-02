@@ -2,6 +2,12 @@
 
 This application is designed to help you easily track and visualize your time spent on Jira tickets. With an intuitive interface, you can start and stop timers, manually add and edit worklogs, and get a clear overview of your daily and weekly progress.
 
+### [Feature Requests](https://github.com/yrambler2001/jira-time-tracker/issues?q=state%3Aopen%20label%3Aenhancement)
+
+### [Known issues](https://github.com/yrambler2001/jira-time-tracker/issues?q=state%3Aopen%20label%3Abug)
+
+### [Changelog](./CHANGELOG.md)
+
 ## Getting Started: Initial Setup
 
 Before you can start tracking time, you need to connect the application to your Jira account.
@@ -10,7 +16,7 @@ Before you can start tracking time, you need to connect the application to your 
 2.  In the Settings modal, you will need to provide the following information:
     - **Jira Subdomain**: This is the unique part of your organization's Jira URL. For example, if your Jira URL is `https://my-company.atlassian.net`, your subdomain is `my-company`.
     - **Your Email**: The email address you use for your Jira account.
-    - **Jira API Token**: A personal access token for your Jira account. You can create one by following the instructions on the Atlassian website. For security reasons, this token is stored only in your browser's local storage.
+    - **Jira API Token**: You can create a personal access token for your Jira account by following the instructions on the Atlassian website. Open the link under the field ([link](https://id.atlassian.com/manage-profile/security/api-tokens)) and click "Create API Token". Choose a clear name for the token to distinguish it from others and clarify its purpose. For security, the token is stored only in your browser's local storage. It is advisable to set a one-year expiration to avoid weekly refreshes.
 3.  Click **Save**. The application will then connect to your Jira account and fetch your data.
 
 ## The Dashboard
