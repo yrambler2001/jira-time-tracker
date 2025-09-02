@@ -36,6 +36,7 @@ export default function App() {
     jiraToken: '',
     jiraSubdomain: '',
     displayOnNewLine: false,
+    isHeaderNonFloating: false,
     theme: 'system',
   });
 
@@ -417,7 +418,7 @@ export default function App() {
       />
 
       <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
-        <div className="max-w-7xl mx-auto sticky top-4 z-10">
+        <div className={`max-w-7xl mx-auto z-10 ${settings.isHeaderNonFloating ? '' : 'sticky top-4'}`}>
           <Header
             totalTrackedTodayInSeconds={totalTrackedTodayInSeconds}
             selectedDate={selectedDate}

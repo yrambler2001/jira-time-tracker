@@ -131,6 +131,7 @@ export interface Settings {
   email: string;
   jiraSubdomain: string;
   displayOnNewLine: boolean;
+  isHeaderNonFloating: boolean;
   theme: Theme;
 }
 
