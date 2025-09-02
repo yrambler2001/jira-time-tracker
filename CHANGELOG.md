@@ -1,3 +1,7 @@
+## <small>2.2.0 (2025-09-02)</small>
+
+- Mobile UI / small window support
+
 ## <small>2.1.0 (2025-09-02)</small>
 
 - Configure floating state of the header in the settings

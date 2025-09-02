@@ -417,49 +417,53 @@ export default function App() {
         onSave={handleSaveActiveTracking}
       />
 
-      <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-6 lg:p-8 min-h-screen">
-        <div className={`max-w-7xl mx-auto z-10 ${settings.isHeaderNonFloating ? '' : 'sticky top-4'}`}>
-          <Header
-            totalTrackedTodayInSeconds={totalTrackedTodayInSeconds}
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            setSearchModalOpen={setSearchModalOpen}
-            setSettingsOpen={setSettingsOpen}
-            timelineData={timelineData}
-            hoveredLogId={hoveredLogId}
-            setHoveredLogId={setHoveredLogId}
-            handleRowClick={handleRowClick}
-          />
+      <div>
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-w-[1024px]">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className={`max-w-7xl mx-auto z-10 ${settings.isHeaderNonFloating ? '' : 'sticky top-4'}`}>
+              <Header
+                totalTrackedTodayInSeconds={totalTrackedTodayInSeconds}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                setSearchModalOpen={setSearchModalOpen}
+                setSettingsOpen={setSettingsOpen}
+                timelineData={timelineData}
+                hoveredLogId={hoveredLogId}
+                setHoveredLogId={setHoveredLogId}
+                handleRowClick={handleRowClick}
+              />
+            </div>
+
+            {timelineData.allLogs.length > 0 && (
+              <TimelineTable
+                logs={timelineData.allLogs}
+                hoveredLogId={hoveredLogId}
+                setHoveredLogId={setHoveredLogId}
+                onRowClick={handleRowClick}
+                onEditTracking={handleEditActiveTracking}
+                onStopTracking={handleStopTracking}
+                onDiscardTracking={handleDiscardTracking}
+                onStartTracking={handleStartTracking}
+                onAddLog={handleAddLog}
+                onDeleteLog={handleDeleteLog}
+                starredTickets={state.starredTickets}
+                toggleStar={toggleStar}
+              />
+            )}
+
+            <footer className="text-center py-8 pb-0 text-gray-500 dark:text-gray-400">
+              <small>
+                Made with
+                <span className="mx-1 text-red-500" role="img" aria-label="love">
+                  ❤
+                </span>
+                by yrambler2001
+                <br />
+                Copyright © 2001-2025 - All Rights Reserved
+              </small>
+            </footer>
+          </div>
         </div>
-
-        {timelineData.allLogs.length > 0 && (
-          <TimelineTable
-            logs={timelineData.allLogs}
-            hoveredLogId={hoveredLogId}
-            setHoveredLogId={setHoveredLogId}
-            onRowClick={handleRowClick}
-            onEditTracking={handleEditActiveTracking}
-            onStopTracking={handleStopTracking}
-            onDiscardTracking={handleDiscardTracking}
-            onStartTracking={handleStartTracking}
-            onAddLog={handleAddLog}
-            onDeleteLog={handleDeleteLog}
-            starredTickets={state.starredTickets}
-            toggleStar={toggleStar}
-          />
-        )}
-
-        <footer className="text-center py-8 pb-0 text-gray-500 dark:text-gray-400">
-          <small>
-            Made with
-            <span className="mx-1 text-red-500" role="img" aria-label="love">
-              ❤
-            </span>
-            by yrambler2001
-            <br />
-            Copyright © 2001-2025 - All Rights Reserved
-          </small>
-        </footer>
       </div>
     </>
   );

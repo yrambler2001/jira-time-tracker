@@ -36,17 +36,17 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b dark:border-gray-700 pb-4">
+      <div className="flex justify-between items-start sm:items-center mb-6 border-b dark:border-gray-700 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Jira Timelogs Dashboard</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">For developers by developers.</p>
         </div>
-        <div className="flex items-end gap-4 mt-4 sm:mt-0">
+        <div className="flex items-end gap-4">
           <div className="text-right">
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Total for Day</label>
             <div className="p-2 font-bold text-lg text-gray-800 dark:text-white">{formatTotalSeconds(totalTrackedTodayInSeconds)}</div>
           </div>
-          <div>
+          <div className="overflow-hidden">
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Select Date</label>
             <input
               type="date"

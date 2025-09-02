@@ -18,6 +18,7 @@ const matchURL = (url: string) => {
 // https://vite.dev/config/
 export default defineConfig({
   server: {
+    host: true,
     proxy: {
       '/proxy': {
         target: (([req]: any) => matchURL(req.originalUrl).origin) as unknown as string,

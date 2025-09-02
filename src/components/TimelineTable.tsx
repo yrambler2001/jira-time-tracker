@@ -33,32 +33,41 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
 }) => (
   <div className="mt-8 max-w-7xl mx-auto">
     <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Timelog Details</h2>
-    <div className="shadow border-b border-gray-200 dark:border-gray-700 sm:rounded-lg overflow-hidden">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
+    <div className="shadow border-b border-gray-200 dark:border-gray-700 sm:rounded-lg overflow-x-auto">
+      <table className="min-w-[950px] lg:min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
-            <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th
+              scope="col"
+              className="w-1/12 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+            >
               Star
             </th>
-            <th scope="col" className="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-1/6 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Ticket ID
             </th>
-            <th scope="col" className="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-1/4 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Ticket Name
             </th>
-            <th scope="col" className="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-1/4 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Work Description
             </th>
-            <th scope="col" className="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-1/6 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Start Time
             </th>
-            <th scope="col" className="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th scope="col" className="w-1/6 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               End Time
             </th>
-            <th scope="col" className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th
+              scope="col"
+              className="w-1/12 px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+            >
               Duration
             </th>
-            <th scope="col" className="w-auto px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            <th
+              scope="col"
+              className="w-auto px-3 lg:px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
@@ -80,7 +89,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                 }
               }}
             >
-              <td className="px-6 py-4">
+              <td className="px-3 lg:px-4 xl:px-6 py-4">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -93,7 +102,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                   <StarIcon filled={starredTickets.includes(log.issue.key)} />
                 </button>
               </td>
-              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm font-medium text-gray-900 dark:text-white break-words">
                 {log.issue.self ? (
                   <a
                     href={`${new URL(log.issue.self).origin}/browse/${log.issue.key}`}
@@ -108,16 +117,18 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
                   log.issue.key
                 )}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
                 {log.issue.fields.summary}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
                 {log.isTracking ? log.workDescription || <i className="text-gray-400">In progress...</i> : (log as ProcessedTimelog).workDescription}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>
-              <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{!log.isTracking ? (log as ProcessedTimelog).endDateDisplay : ''}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{log.durationString}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
+                {!log.isTracking ? (log as ProcessedTimelog).endDateDisplay : ''}
+              </td>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{log.durationString}</td>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                 {log.isTracking ? (
                   <div className="flex gap-2">
                     <button
