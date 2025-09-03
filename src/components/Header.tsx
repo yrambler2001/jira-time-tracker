@@ -2,7 +2,7 @@ import React from 'react';
 import moment from 'moment';
 import { SettingsIcon, SearchIcon } from './Icons';
 import Timeline from './Timeline';
-import type { ProcessedTimelog } from '../types/jira';
+import type { ProcessedTimelog, JiraAccount } from '../types/jira';
 import { formatTotalSeconds } from '../utils/time';
 
 interface HeaderProps {
@@ -16,6 +16,7 @@ interface HeaderProps {
   hoveredLogId: string | null;
   setHoveredLogId: (id: string | null) => void;
   handleRowClick: (log: ProcessedTimelog) => void;
+  activeAccount: JiraAccount | undefined;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -28,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   hoveredLogId,
   setHoveredLogId,
   handleRowClick,
+  activeAccount,
 }) => {
   const formatDateForInput = (date: Date | null) => {
     if (!date) return '';
@@ -39,7 +41,10 @@ const Header: React.FC<HeaderProps> = ({
       <div className="flex justify-between items-start sm:items-center mb-6 border-b dark:border-gray-700 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Jira Timelogs Dashboard</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">For developers by developers.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            For developers by developers
+            {activeAccount?.jiraSubdomain && ` - ${activeAccount.jiraSubdomain}`}
+          </p>
         </div>
         <div className="flex items-end gap-4">
           <div className="text-right">

@@ -1,3 +1,9 @@
+## <small>2.3.0 (2025-09-03)</small>
+
+- Added support for multiple accounts
+
+- Added migrations service
+
 ## <small>2.2.0 (2025-09-02)</small>
 
 - Mobile UI / small window support

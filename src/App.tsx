@@ -12,7 +12,7 @@ import AddTimelogModal from './components/AddTimelogModal';
 import EditTimelogModal from './components/EditTimelogModal';
 import EditTrackingModal from './components/EditTrackingModal';
 import EditActiveTrackingModal from './components/EditActiveTrackingModal';
-import type { Settings, ProcessedTimelog, TrackedTicket, JiraTicket, State } from './types/jira';
+import type { JiraAccount, Settings, ProcessedTimelog, TrackedTicket, JiraTicket, State } from './types/jira';
 import { formatDuration } from './utils/time';
 import { extractTextFromAtlassianDocumentFormat } from './utils/jira';
 import useTheme from './hooks/useTheme';
@@ -32,17 +32,19 @@ window._ = _;
 
 export default function App() {
   const [settings, setSettings] = useLocalStorage<Settings>('jiraTimelogSettings', {
-    email: '',
-    jiraToken: '',
-    jiraSubdomain: '',
+    accounts: [],
+    activeAccount: '',
     displayOnNewLine: false,
     isHeaderNonFloating: false,
     theme: 'system',
   });
 
+  const activeAccount = useMemo<JiraAccount | undefined>(
+    () => settings.accounts.find((a) => a.id === settings.activeAccount),
+    [settings.accounts, settings.activeAccount],
+  );
   useTheme(settings.theme);
-
-  const { client, state, backendData, fetchWorklogs, updateState } = useJira(settings);
+  const { client, state, backendData, fetchWorklogs, updateState } = useJira(activeAccount);
 
   const [selectedDate, setSelectedDate] = useState<Date>(moment().toDate());
   const [hoveredLogId, setHoveredLogId] = useState<string | null>(null);
@@ -168,7 +170,7 @@ export default function App() {
     const maxDateMinDateDuration = maxDate.getTime() - minDate.getTime();
     const tickCount = 5;
     const xAxisTicks = Array.from({ length: tickCount + 1 }, (_, i) => new Date(minDate.getTime() + (maxDateMinDateDuration / tickCount) * i));
-    const colors = ['#008FFB']; //, '#00E396', '#FEB019', '#FF4560', '#775DD0'];
+    const colors = ['#008FFB']; // , '#00E396', '#FEB019', '#FF4560', '#775DD0'];
     const issueKeys = _.uniq(allLogs.map((log) => log.issue.key));
 
     const ticketColors = issueKeys.reduce(
@@ -368,7 +370,13 @@ export default function App() {
         onConfirm={confirmModalState.onConfirm}
       />
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} setSettings={setSettings} />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        setSettings={setSettings}
+        activeAccount={activeAccount}
+      />
       <SearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setSearchModalOpen(false)}
@@ -431,6 +439,7 @@ export default function App() {
                 hoveredLogId={hoveredLogId}
                 setHoveredLogId={setHoveredLogId}
                 handleRowClick={handleRowClick}
+                activeAccount={activeAccount}
               />
             </div>
 

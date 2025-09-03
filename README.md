@@ -13,7 +13,7 @@ This application is designed to help you easily track and visualize your time sp
 Before you can start tracking time, you need to connect the application to your Jira account.
 
 1.  Click on the **Settings** icon (⚙️) in the top-right corner of the dashboard.
-2.  In the Settings modal, you will need to provide the following information:
+2.  In the Settings modal, click on the **+** icon, you will need to provide the following information:
     - **Jira Subdomain**: This is the unique part of your organization's Jira URL. For example, if your Jira URL is `https://my-company.atlassian.net`, your subdomain is `my-company`.
     - **Your Email**: The email address you use for your Jira account.
     - **Jira API Token**: You can create a personal access token for your Jira account by following the instructions on the Atlassian website. Open the link under the field ([link](https://id.atlassian.com/manage-profile/security/api-tokens)) and click "Create API Token". Choose a clear name for the token to distinguish it from others and clarify its purpose. For security, the token is stored only in your browser's local storage. It is advisable to set a one-year expiration to avoid weekly refreshes.

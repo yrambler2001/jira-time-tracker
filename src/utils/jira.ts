@@ -1,19 +1,24 @@
 import type { State } from '../types/jira';
+import { migrateJiraState } from '../services/migration';
+import { JiraApiClient } from '../services/jira';
 
 export const JIRA_PROPERTY_KEY = 'com.yrambler2001.jira-tracker';
 
-export const parseState = (state: string): State => {
+export const parseState = async (state: string, client: JiraApiClient): Promise<State> => {
   let parsed: State | null = null;
   try {
     if (state) {
       parsed = JSON.parse(state);
+      const { migratedData, isMigrated } = migrateJiraState(parsed as State);
+      if (isMigrated) {
+        await client.setUserProperty(JIRA_PROPERTY_KEY, stringifyState(migratedData));
+        return migratedData;
+      }
     }
   } catch (e) {
     console.error('Could not parse state from Jira user property', e);
   }
   if (!parsed || typeof parsed !== 'object') parsed = { trackedTickets: {}, starredTickets: [] };
-  if (!parsed.trackedTickets) parsed.trackedTickets = {};
-  if (!parsed.starredTickets) parsed.starredTickets = [];
   return parsed as State;
 };
 
@@ -21,6 +26,7 @@ export const stringifyState = (state: State): string => {
   const stateToStore = {
     trackedTickets: state.trackedTickets,
     starredTickets: state.starredTickets,
+    version: state.version,
   };
   return JSON.stringify(stateToStore);
 };

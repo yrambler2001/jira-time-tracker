@@ -126,13 +126,20 @@ export interface ProcessedTimelog extends JiraTimelog {
   isTracking?: false;
 }
 
-export interface Settings {
+export interface JiraAccount {
+  id: string;
   jiraToken: string;
   email: string;
   jiraSubdomain: string;
+}
+
+export interface Settings {
+  accounts: JiraAccount[];
+  activeAccount: string;
   displayOnNewLine: boolean;
   isHeaderNonFloating: boolean;
   theme: Theme;
+  version?: number;
 }
 
 export type Theme = 'light' | 'dark' | 'system';
@@ -172,4 +179,5 @@ export interface State {
   };
   starredTickets: string[];
   isDefault?: boolean;
+  version?: number;
 }
