@@ -16,6 +16,7 @@ import type { JiraAccount, Settings, ProcessedTimelog, TrackedTicket, JiraTicket
 import { formatDuration } from './utils/time';
 import { extractTextFromAtlassianDocumentFormat } from './utils/jira';
 import useTheme from './hooks/useTheme';
+import { randomUUID } from './utils/uuid';
 
 // Makes sure global libraries are available for debugging if needed
 declare global {
@@ -243,7 +244,7 @@ export default function App() {
   const handleStartTracking = useCallback(
     (ticket: JiraTicket) => {
       updateState((currentState) => {
-        const newTrackingId = crypto.randomUUID();
+        const newTrackingId = randomUUID();
         const newTrackedTickets = {
           ...currentState.trackedTickets,
           [newTrackingId]: {

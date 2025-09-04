@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import type { JiraAccount, Settings } from '../types/jira';
+import { randomUUID } from '../utils/uuid';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const handleAddAccount = () => {
     if (!localSettings) return;
     const newAccount: JiraAccount = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       jiraSubdomain: '',
       email: '',
       jiraToken: '',

@@ -1,4 +1,5 @@
 import type { State, Settings } from '../types/jira';
+import { randomUUID } from '../utils/uuid';
 
 interface Migration {
   version: number;
@@ -15,7 +16,7 @@ const localStorageMigrations: Migration[] = [
   {
     version: 2,
     migrate: (data: { jiraToken: string; email: string; jiraSubdomain: string; displayOnNewLine: boolean; isHeaderNonFloating: boolean; theme: string }) => {
-      const newId = crypto.randomUUID();
+      const newId = randomUUID();
       return {
         accounts: [
           {
