@@ -181,3 +181,9 @@ export interface State {
   isDefault?: boolean;
   version?: number;
 }
+
+export interface JiraProject {
+  id: string;
+  key: string;
+  name: string;
+}

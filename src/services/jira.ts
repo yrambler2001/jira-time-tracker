@@ -12,6 +12,7 @@ import type {
   SearchIssuesParams,
   FetchPaginatedWorklogsParams,
   JiraAuthConfig,
+  JiraProject,
 } from '../types/jira';
 
 export class JiraApiClient {
@@ -221,6 +222,23 @@ export class JiraApiClient {
       }
     } catch (error) {
       console.error(`Error deleting worklog '${worklogId}' from issue '${issueIdOrKey}':`, error);
+      throw error;
+    }
+  }
+
+  async getAllProjects(): Promise<JiraProject[]> {
+    const url = `${this.baseUrl}/rest/api/3/project`;
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: this.authHeader, Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.status} ${await response.text()}`);
+      }
+      return (await response.json()) as JiraProject[];
+    } catch (error) {
+      console.error('Error in getAllProjects:', error);
       throw error;
     }
   }
