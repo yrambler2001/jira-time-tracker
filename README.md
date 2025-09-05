@@ -74,9 +74,13 @@ The integrated search functionality makes it easy to find the tickets you need.
 
 - **Search Modal**: Click the **Search** icon (🔍) to open the search modal.
 - **Search By**: You can search for tickets using different criteria:
-  - **Full Key**: e.g., "PROJ-123"
-  - **Summary**: Search for keywords in the ticket's summary (title).
-  - **Text**: A broader search that includes the summary, description, and comments.
+  - **Key / Text fields (Default)**: This is the most powerful and recommended search option. It works in several ways:
+      - If you enter a **full key** (e.g., "PROJ-123"), it will find the exact ticket.
+      - If you enter just a **number** (e.g., "123"), it will automatically search for that number across all your projects (e.g., "PROJ-123", "TEST-123", etc.).
+      - If you enter any other **text**, it will perform a broad search across the ticket's summary, description, and comments.
+  - **Key**: If you enter a **full key** (e.g., "PROJ-123"), it will find the exact ticket. If you enter just a **number** (e.g., "123"), it will automatically search for that number across all your projects (e.g., "PROJ-123", "TEST-123", etc.).
+  - **Label**: Search for keywords in the ticket's summary (title).
+  - **Text fields**: A broad search that includes the summary, description, and comments, but not the key. 
   - **My Tickets on Board**: Shows tickets assigned to you in open sprints.
   - **JQL**: For advanced users, you can use a custom JQL query.
 - **Order By**: You can sort the search results by Key, Time Spent, Updated date, or Priority.

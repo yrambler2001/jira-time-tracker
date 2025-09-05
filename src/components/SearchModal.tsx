@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from './Modal';
-import type { JiraTicket } from '../types/jira';
+import type { JiraTicket, JiraProject } from '../types/jira';
 import { StarIcon } from './Icons';
 import { JiraApiClient } from '../services/jira';
 
@@ -14,14 +14,29 @@ interface SearchModalProps {
   toggleStar: (key: string) => void;
 }
 
+type SearchType = 'key' | 'text' | 'summary' | 'jql' | 'myTickets' | 'keyOrText';
+
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, onStartTracking, client, starredTickets, toggleStar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<JiraTicket[]>([]);
   const [starredIssues, setStarredIssues] = useState<JiraTicket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStarred, setIsLoadingStarred] = useState(false);
-  const [searchType, setSearchType] = useState<'key' | 'text' | 'summary' | 'jql' | 'myTickets'>('key');
+  const [searchType, setSearchType] = useState<SearchType>('keyOrText');
   const [orderBy, setOrderBy] = useState('key');
+  
+  const [projectKeys, setProjectKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen && client && projectKeys.length === 0) {
+      client.getAllProjects()
+        .then(projects => {
+          const keys = projects.map(p => p.key);
+          setProjectKeys(keys);
+        })
+        .catch(err => console.error('Failed to fetch project keys', err));
+    }
+  }, [isOpen, client, projectKeys.length]);
 
   useEffect(() => {
     if (isOpen && client && starredTickets.length > 0) {
@@ -45,27 +60,36 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
   }, [isOpen, client, starredTickets]);
 
   const performSearch = useCallback(
-    (currentSearchTerm: string, currentSearchType: string, currentOrderBy: string) => {
+    (currentSearchTerm: string, currentSearchType: SearchType, currentOrderBy: string) => {
       if (!client) return;
 
       let isSearchable = false;
       if (currentSearchType === 'myTickets') {
         isSearchable = true;
-      } else if (currentSearchType === 'jql') {
-        isSearchable = currentSearchTerm.length > 0;
       } else {
-        isSearchable = currentSearchTerm.length > 2;
+        isSearchable = currentSearchTerm.length > 0;
       }
 
       if (isSearchable) {
         setIsLoading(true);
         let baseJql = '';
+
+        const isNumericSearch = /^\d+$/.test(currentSearchTerm);
+        const keyQueryPart = isNumericSearch && projectKeys.length > 0 
+            ? projectKeys.map(key => `key = "${key}-${currentSearchTerm}"`).join(' OR ')
+            : `key = "${currentSearchTerm.toUpperCase()}"`;
+        
+        const textQueryPart = `text ~ "${currentSearchTerm}"`;
+
         switch (currentSearchType) {
+          case 'keyOrText':
+            baseJql = `(${keyQueryPart}) OR ${textQueryPart}`;
+            break;
           case 'key':
-            baseJql = `key = "${currentSearchTerm.toUpperCase()}"`;
+            baseJql = keyQueryPart;
             break;
           case 'text':
-            baseJql = `text ~ "${currentSearchTerm}"`;
+            baseJql = textQueryPart;
             break;
           case 'summary':
             baseJql = `summary ~ "${currentSearchTerm}"`;
@@ -85,7 +109,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
             break;
           case 'timespent':
             orderByClause = ' order by timespent desc';
-            baseJql += ' and timespent is not empty';
+            if (!baseJql.toLowerCase().includes('timespent')) baseJql += ' and timespent is not empty';
             break;
           case 'updated':
             orderByClause = ' order by updated desc';
@@ -113,7 +137,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
         setSearchResults([]);
       }
     },
-    [client],
+    [client, projectKeys],
   );
 
   useEffect(() => {
@@ -192,14 +216,15 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
             <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Search by:</span>
             {renderRadioGroup(
               [
-                { value: 'key', label: 'Full Key' },
+                { value: 'keyOrText', label: 'Key / Text fields' },
+                { value: 'key', label: 'Key' },
                 { value: 'summary', label: 'Label' },
-                { value: 'text', label: 'Text' },
+                { value: 'text', label: 'Text fields' },
                 { value: 'myTickets', label: 'My Tickets on Board' },
                 { value: 'jql', label: 'JQL' },
               ],
               searchType,
-              setSearchType,
+              (value) => setSearchType(value as SearchType),
               'searchType',
             )}
           </div>
@@ -234,7 +259,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
 
           {!isLoading && searchResults.map(renderTicketRow)}
 
-          {!isLoading && searchType !== 'myTickets' && searchTerm.length > 2 && searchResults.length === 0 && (
+          {!isLoading && searchType !== 'myTickets' && searchTerm.length > 0 && searchResults.length === 0 && (
             <div className="p-2 text-center text-gray-500">No results found.</div>
           )}
           {!isLoadingStarred && searchTerm.length === 0 && searchType !== 'myTickets' && starredTickets.length === 0 && (
