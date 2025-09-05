@@ -78,7 +78,7 @@ The integrated search functionality makes it easy to find the tickets you need.
       - If you enter a **full key** (e.g., "PROJ-123"), it will find the exact ticket.
       - If you enter just a **number** (e.g., "123"), it will automatically search for that number across all your projects (e.g., "PROJ-123", "TEST-123", etc.).
       - If you enter any other **text**, it will perform a broad search across the ticket's summary, description, and comments.
-  - **Key**: Use this for an exact key match (e.g., "PROJ-123").
+  - **Key**: If you enter a **full key** (e.g., "PROJ-123"), it will find the exact ticket. If you enter just a **number** (e.g., "123"), it will automatically search for that number across all your projects (e.g., "PROJ-123", "TEST-123", etc.).
   - **Label**: Search for keywords in the ticket's summary (title).
   - **Text fields**: A broad search that includes the summary, description, and comments, but not the key. 
   - **My Tickets on Board**: Shows tickets assigned to you in open sprints.
