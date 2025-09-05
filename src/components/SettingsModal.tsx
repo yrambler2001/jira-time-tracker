@@ -32,7 +32,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     setLocalSettings({ ...localSettings, accounts: newAccounts });
   };
   const handleGlobalSettingChange = (field: keyof Settings, value: any) => {
-    console.log('asdf')
     if (!localSettings) return;
     setLocalSettings({ ...localSettings, [field]: value });
   };

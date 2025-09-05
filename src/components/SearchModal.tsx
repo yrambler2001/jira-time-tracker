@@ -217,9 +217,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
             {renderRadioGroup(
               [
                 { value: 'keyOrText', label: 'Key / Text' },
-                { value: 'key', label: 'Full Key' },
+                { value: 'key', label: 'Key' },
                 { value: 'summary', label: 'Label' },
-                { value: 'text', label: 'Text Only' },
+                { value: 'text', label: 'Text' },
                 { value: 'myTickets', label: 'My Tickets on Board' },
                 { value: 'jql', label: 'JQL' },
               ],
