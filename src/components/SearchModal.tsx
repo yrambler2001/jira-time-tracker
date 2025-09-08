@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from './Modal';
 import type { JiraTicket, JiraProject } from '../types/jira';
-import { StarIcon } from './Icons';
+import { StarIcon, SettingsIcon } from './Icons';
 import { JiraApiClient } from '../services/jira';
 
 interface SearchModalProps {
@@ -24,6 +24,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
   const [isLoadingStarred, setIsLoadingStarred] = useState(false);
   const [searchType, setSearchType] = useState<SearchType>('keyOrText');
   const [orderBy, setOrderBy] = useState('key');
+
+  const [areOptionsVisible, setAreOptionsVisible] = useState(false);
   
   const [projectKeys, setProjectKeys] = useState<string[]>([]);
 
@@ -144,6 +146,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
     if (!isOpen) {
       setSearchTerm('');
       setSearchResults([]);
+      setAreOptionsVisible(false);
       return;
     }
 
@@ -200,7 +203,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Search Jira Ticket">
       <div className="space-y-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             placeholder="Search for a ticket..."
@@ -210,40 +213,50 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onAddLog, on
             autoFocus
             disabled={searchType === 'myTickets'}
           />
+          <button 
+            onClick={() => setAreOptionsVisible(!areOptionsVisible)} 
+            className="p-2.5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+            aria-label="Toggle search options"
+          >
+            <SettingsIcon />
+          </button>
         </div>
-        <div className="space-y-2">
-          <div>
-            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Search by:</span>
-            {renderRadioGroup(
-              [
-                { value: 'keyOrText', label: 'Key / Text fields' },
-                { value: 'key', label: 'Key' },
-                { value: 'summary', label: 'Label' },
-                { value: 'text', label: 'Text fields' },
-                { value: 'myTickets', label: 'My Tickets on Board' },
-                { value: 'jql', label: 'JQL' },
-              ],
-              searchType,
-              (value) => setSearchType(value as SearchType),
-              'searchType',
-            )}
+        
+        {areOptionsVisible && (
+          <div className="space-y-2 border-t dark:border-gray-700 pt-4">
+            <div>
+              <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Search by:</span>
+              {renderRadioGroup(
+                [
+                  { value: 'keyOrText', label: 'Key / Text fields' },
+                  { value: 'key', label: 'Key' },
+                  { value: 'summary', label: 'Label' },
+                  { value: 'text', label: 'Text fields' },
+                  { value: 'myTickets', label: 'My Tickets on Board' },
+                  { value: 'jql', label: 'JQL' },
+                ],
+                searchType,
+                (value) => setSearchType(value as SearchType),
+                'searchType',
+              )}
+            </div>
+            <div>
+              <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Order by:</span>
+              {renderRadioGroup(
+                [
+                  { value: 'key', label: 'Key' },
+                  { value: 'timespent', label: 'Time Spent' },
+                  { value: 'updated', label: 'Updated' },
+                  { value: 'priority', label: 'Priority' },
+                ],
+                orderBy,
+                setOrderBy,
+                'orderBy',
+              )}
+            </div>
           </div>
-          <div>
-            <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Order by:</span>
-            {renderRadioGroup(
-              [
-                { value: 'key', label: 'Key' },
-                { value: 'timespent', label: 'Time Spent' },
-                { value: 'updated', label: 'Updated' },
-                { value: 'priority', label: 'Priority' },
-              ],
-              orderBy,
-              setOrderBy,
-              'orderBy',
-            )}
-          </div>
-        </div>
-
+        )}
+        
         <div className="max-h-150 overflow-y-auto">
           {isLoading && <div className="p-2 text-center text-gray-500">Searching...</div>}
           {isLoadingStarred && searchTerm.length === 0 && searchType !== 'myTickets' && (
