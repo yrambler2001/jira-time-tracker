@@ -120,7 +120,7 @@ const TimelineTable: React.FC<TimelineTableProps> = ({
               <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
                 {log.issue.fields.summary}
               </td>
-              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300" style={{ wordBreak: 'break-word' }}>
+              <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300 whitespace-pre-line" style={{ wordBreak: 'break-word' }}>
                 {log.isTracking ? log.workDescription || <i className="text-gray-400">In progress...</i> : (log as ProcessedTimelog).workDescription}
               </td>
               <td className="px-3 lg:px-4 xl:px-6 py-4 text-sm text-gray-500 dark:text-gray-300">{log.startDateDisplay}</td>

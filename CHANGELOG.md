@@ -1,3 +1,7 @@
+## <small>2.5.0 (2025-09-23)</small>
+
+- Display newlines in Work Description column and tooltip
+
 ## <small>2.4.0 (2025-09-05)</small>
 
 - Added search by "key and text" https://github.com/yrambler2001/jira-time-tracker/pull/24

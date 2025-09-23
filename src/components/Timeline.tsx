@@ -6,7 +6,7 @@ interface TimelineTooltipProps {
   log: ProcessedTimelog;
 }
 const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ log }) => (
-  <div className="timeline-tooltip absolute bottom-full mb-2 w-80 max-w-xs bg-gray-800 text-white text-xs rounded py-1 px-2 z-20 shadow-lg whitespace-normal break-words">
+  <div className="timeline-tooltip absolute bottom-full mb-2 w-80 max-w-xs bg-gray-800 text-white text-xs rounded py-1 px-2 z-20 shadow-lg break-words whitespace-pre-line">
     <strong className="font-bold">{log.issue.key}:</strong> {log.issue.fields.summary}
     <br /> <strong>Start:</strong> {log.startDateString}
     <br /> <strong>End:</strong> {log.endDateString}
