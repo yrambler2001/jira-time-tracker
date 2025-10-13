@@ -15,9 +15,10 @@ interface TimelogFormProps {
   onSave: (data: any) => void;
   onDelete?: () => void;
   buttonText: string;
+  isSubmitting?: boolean;
 }
 
-const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, onDelete, buttonText }) => {
+const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, onDelete, buttonText, isSubmitting = false }) => {
   const [startTime, setStartTime] = useState(initialData.startDateMoment.format('YYYY-MM-DD HH:mm:ss'));
   const [endTime, setEndTime] = useState(initialData.endDateMoment.format('YYYY-MM-DD HH:mm:ss'));
   const [duration, setDuration] = useState(initialData.durationString);
@@ -134,8 +135,12 @@ const TimelogForm: React.FC<TimelogFormProps> = ({ initialData, onSave, onDelete
             Delete
           </button>
         )}
-        <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto">
-          {buttonText}
+        <button
+          onClick={handleSave}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-auto disabled:opacity-50"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Submitting...' : buttonText}
         </button>
       </div>
     </div>

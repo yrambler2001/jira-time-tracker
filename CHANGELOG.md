@@ -1,3 +1,7 @@
+## <small>2.6.0 (2025-10-13)</small>
+
+- Do not allow to doubleclick submit button on some modals
+
 ## <small>2.5.0 (2025-09-23)</small>
 
 - Display newlines in Work Description column and tooltip

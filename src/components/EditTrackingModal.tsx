@@ -4,6 +4,7 @@ import Modal from './Modal';
 import TimelogForm from './TimelogForm';
 import { JiraApiClient } from '../services/jira';
 import { formatSecondsToDuration } from '../utils/time';
+import useDebounceClick from '../hooks/useDebounceClick';
 
 interface EditTrackingModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface EditTrackingModalProps {
 }
 
 const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, trackingInfo, client, onUpdate, onDiscard }) => {
+  const { isWaitingForPreviousClickAction, isWaitingForPreviousClickActionRef, onClickActionStarted, onClickActionCompleted } = useDebounceClick();
+
   if (!trackingInfo || !client) return null;
 
   const startMoment = moment(trackingInfo.startTime);
@@ -29,13 +32,17 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
   };
 
   const handleSave = async (data: any) => {
+    if (isWaitingForPreviousClickActionRef.current) return;
+    onClickActionStarted();
     try {
       await client.addWorklog(trackingInfo.key, data);
       onUpdate();
     } catch (error) {
       console.error('Failed to add worklog:', error);
+      onClickActionCompleted();
     }
     onClose();
+    setTimeout(() => onClickActionCompleted(), 1000 /* waiting for close modal animation */);
   };
 
   return (
@@ -48,6 +55,7 @@ const EditTrackingModal: React.FC<EditTrackingModalProps> = ({ isOpen, onClose, 
           onClose();
         }}
         buttonText="Submit Timelog"
+        isSubmitting={isWaitingForPreviousClickAction}
       />
     </Modal>
   );
