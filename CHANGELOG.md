@@ -1,3 +1,7 @@
+## <small>2.7.0 (2025-10-16)</small>
+
+- Allow to clear work description
+
 ## <small>2.6.0 (2025-10-13)</small>
 
 - Do not allow to doubleclick submit button on some modals
